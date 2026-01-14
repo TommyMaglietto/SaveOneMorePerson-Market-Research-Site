@@ -4,6 +4,11 @@ import { cookies } from "next/headers";
 import { ADMIN_COOKIE_NAME, isAdminSession } from "@/lib/admin";
 import { supabaseAdmin } from "@/lib/supabase";
 
+type RatingValue = 1 | 2 | 3 | 4 | 5;
+
+const isRatingValue = (value: unknown): value is RatingValue =>
+  typeof value === "number" && value >= 1 && value <= 5;
+
 export async function GET(request: Request) {
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get(ADMIN_COOKIE_NAME)?.value;
@@ -32,15 +37,21 @@ export async function GET(request: Request) {
     );
   }
 
-  const counts = { 1: 0, 2: 0, 3: 0 };
-  const ratingCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  const counts: Record<1 | 2 | 3, number> = { 1: 0, 2: 0, 3: 0 };
+  const ratingCounts: Record<RatingValue, number> = {
+    1: 0,
+    2: 0,
+    3: 0,
+    4: 0,
+    5: 0,
+  };
   let ratingSum = 0;
   let ratingTotal = 0;
   (data ?? []).forEach((row) => {
     if (row.score === 1) counts[1] += 1;
     if (row.score === 2) counts[2] += 1;
     if (row.score === 3) counts[3] += 1;
-    if (typeof row.rating === "number" && row.rating >= 1 && row.rating <= 5) {
+    if (isRatingValue(row.rating)) {
       ratingCounts[row.rating] += 1;
       ratingSum += row.rating;
       ratingTotal += 1;
