@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { supabaseAdmin } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
 export async function GET() {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getSupabaseAdmin()
     .from("Features")
     .select("id, name, description, category")
     .order("name", { ascending: true });

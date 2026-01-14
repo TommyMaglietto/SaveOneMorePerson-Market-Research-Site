@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { supabaseAdmin } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
 type OpinionPayload = {
   featureId?: string;
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { error } = await supabaseAdmin.from("Opinions").insert({
+  const { error } = await getSupabaseAdmin().from("Opinions").insert({
     feature_id: featureId,
     score,
     comment: comment || null,

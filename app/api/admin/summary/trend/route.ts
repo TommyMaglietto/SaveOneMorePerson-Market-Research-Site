@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 import { ADMIN_COOKIE_NAME, isAdminSession } from "@/lib/admin";
-import { supabaseAdmin } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
 type Bucket = "day" | "week" | "month";
 
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     ? bucketParam
     : "day";
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getSupabaseAdmin()
     .from("Opinions")
     .select("created_at, rating")
     .eq("feature_id", featureId)

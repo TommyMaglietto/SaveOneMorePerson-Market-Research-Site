@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 import { ADMIN_COOKIE_NAME, isAdminSession } from "@/lib/admin";
-import { supabaseAdmin } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
 type RatingValue = 1 | 2 | 3 | 4 | 5;
 
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await getSupabaseAdmin()
     .from("Opinions")
     .select("score, rating")
     .eq("feature_id", featureId);

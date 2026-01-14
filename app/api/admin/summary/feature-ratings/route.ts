@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 import { ADMIN_COOKIE_NAME, isAdminSession } from "@/lib/admin";
-import { supabaseAdmin } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
 export async function GET() {
   const cookieStore = await cookies();
@@ -13,8 +13,8 @@ export async function GET() {
 
   const [{ data: features, error: featureError }, { data: opinions, error: opinionsError }] =
     await Promise.all([
-      supabaseAdmin.from("Features").select("id, name, category").order("name"),
-      supabaseAdmin
+      getSupabaseAdmin().from("Features").select("id, name, category").order("name"),
+      getSupabaseAdmin()
         .from("Opinions")
         .select("feature_id, score, rating, comment"),
     ]);
