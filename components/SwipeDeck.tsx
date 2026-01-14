@@ -356,7 +356,7 @@ export default function SwipeDeck() {
         )}
         {currentFeature && (
           <div
-            className="card-surface absolute inset-0 h-full w-full p-6"
+            className="absolute inset-0 h-full w-full"
             style={{
               transform: `translate(${offset.x}px, ${offset.y}px) rotate(${offset.x / 14}deg)`,
               transition,
@@ -372,7 +372,7 @@ export default function SwipeDeck() {
               style={{ perspective: "1200px" }}
             >
               <div
-                className="relative h-full w-full"
+                className="card-surface relative h-full w-full"
                 style={{
                   transformStyle: "preserve-3d",
                   transition: "transform 260ms ease",
@@ -380,7 +380,7 @@ export default function SwipeDeck() {
                 }}
               >
                 <div
-                  className="absolute inset-0 flex h-full w-full flex-col justify-between"
+                  className="absolute inset-0 flex h-full w-full flex-col justify-between p-6"
                   style={{
                     backfaceVisibility: "hidden",
                     pointerEvents: isFlipped ? "none" : "auto",
@@ -444,7 +444,7 @@ export default function SwipeDeck() {
                 </div>
 
                 <div
-                  className="absolute inset-0 flex h-full w-full flex-col"
+                  className="absolute inset-0 flex h-full w-full flex-col p-6"
                   style={{
                     backfaceVisibility: "hidden",
                     transform: "rotateY(180deg)",
