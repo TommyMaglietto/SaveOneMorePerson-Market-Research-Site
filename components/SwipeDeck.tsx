@@ -21,6 +21,10 @@ type Selection = {
 };
 
 type SwipeIntent = "yes" | "maybe" | "no" | null;
+type SwipePreview = {
+  intent: SwipeIntent;
+  strength: number;
+};
 
 const LOCAL_STORAGE_KEY = "somp-selections";
 const SWIPE_THRESHOLD = 80;
@@ -129,7 +133,7 @@ export default function SwipeDeck() {
     ? Math.min(currentIndex + 1, features.length)
     : 0;
 
-  const swipePreview = useMemo(() => {
+  const swipePreview = useMemo<SwipePreview>(() => {
     if (isFlipped) {
       return { intent: null, strength: 0 };
     }
@@ -233,6 +237,12 @@ export default function SwipeDeck() {
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (isLocked || !currentFeature || isFlipped) return;
+    if (
+      event.target instanceof HTMLElement &&
+      event.target.closest("button, a, textarea, input, select")
+    ) {
+      return;
+    }
     event.currentTarget.setPointerCapture(event.pointerId);
     pointerStartRef.current = { x: event.clientX, y: event.clientY };
     setTransition("transform 0ms ease");
