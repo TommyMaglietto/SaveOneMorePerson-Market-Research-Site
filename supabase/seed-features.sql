@@ -1,97 +1,82 @@
 insert into "Features" (name, description, category)
 values
   (
-    'Readable Formatting & Typography',
-    'Beautiful fonts, comfortable sizing, and well-structured text. No tiny print or wall-of-text paragraphs.',
-    'UI/UX'
-  ),
-  (
-    'Emotion-Based Scripture Navigation',
-    'Tap emotions like "stressed," "grateful," or "anxious" to find Scripture that speaks to exactly what you are feeling right now.',
+    'Quick Access by Common Struggles and Emotions',
+    'Tap struggles like lust, anger, pride, loneliness, or doubt and emotions like sad, anxious, scared, stressed, or grateful to jump into guided Scripture and study paths.',
     'Navigation'
   ),
   (
-    'Tap-to-Define Hard Words',
-    'Tap difficult words for instant definitions without leaving the app. Option to explore Greek/Hebrew origins for deeper study.',
-    'Learning'
-  ),
-  (
-    'Devotional-Style Prayers',
-    'Prayers written as if God is speaking directly to you. Encouraging and personal, crafted with care.',
-    'Prayer'
-  ),
-  (
-    'Daily Devotionals & Prayers',
-    'Fresh devotional content and prayers delivered every day to keep you grounded.',
+    'Daily Devotionals and Daily Prayers',
+    'A daily feed of devotional content paired with short prayers. Simple, consistent, and easy to return to each day.',
     'Content'
   ),
   (
     'Clickable Bible Character Names',
-    'Tap any name like David or Ruth to instantly learn who they are and why their story matters.',
+    'Tap names like David, Job, Peter, or Paul to see who they are, story context, key moments, and why they matter.',
     'Learning'
   ),
   (
-    'Jesus'' Words Highlighted',
-    'Everything Jesus said appears in a different color. You can even choose which color works best for you.',
-    'UI/UX'
-  ),
-  (
-    'How to Apply Scripture',
-    'Practical guidance on actually using what you read in your daily life, not just understanding it.',
+    'Tap to Define Hard Words with Depth Options',
+    'Tap difficult words to see definitions inline, with optional Greek or Hebrew word studies for more depth.',
     'Learning'
   ),
   (
-    'Nothing Cringy',
-    'Modern, sincere language that feels real. No forced Christianese or cheesy vibes.',
-    'Content'
-  ),
-  (
-    'Choose-Your-Own-Adventure Learning',
-    'Interactive Bible stories where your choices matter. See how your path compares to what actually happened.',
+    'How to Use Scripture in Your Life',
+    'Practical guidance that turns what you read into real-life steps, habits, prayers, and reflection prompts.',
     'Learning'
   ),
   (
-    'Simplified Modern Language',
-    'Easy to understand without dumbing it down. The Bible made accessible for everyone.',
-    'Content'
-  ),
-  (
-    'Quick Access by Struggles',
-    'Tap common challenges like lust, anger, or doubt to get guided Scripture and study paths instantly.',
-    'Navigation'
+    'Choose-Your-Own-Adventure Learning Mode',
+    'Interactive story experiences where you make choices during Biblical narratives, with optional AI branching and a timeline showing how your path compares to what Jesus did.',
+    'Learning'
   ),
   (
     'Reminder Check-Ins',
-    'Gentle prompts like "What are you feeling right now?" that bring you back when life gets busy.',
+    'Lightweight prompts like "What are you feeling right now?" or "Need Scripture for your current mood?" to encourage re-engagement.',
     'Community'
   ),
   (
-    'Modern Interactive Format',
-    'Fresh UI with creative, engaging components. Not your grandfather''s Bible app.',
-    'UI/UX'
+    'Anonymous Forum Posting',
+    'Post questions anonymously and receive anonymous responses from the community.',
+    'Community'
   ),
   (
-    'Natural Language Prayer Prompt',
-    'Just type how you feel: "Hey God, I am anxious, help me out." Simple. Real. No formality required.',
+    'Faith Friend Matching',
+    'Anonymous matching with someone in a similar life stage or struggle for encouragement and accountability.',
+    'Community'
+  ),
+  (
+    'Anonymous Scripture Interpretations',
+    'View anonymous interpretations and reflections when reading specific books, stories, or verses.',
+    'Community'
+  ),
+  (
+    'Voice Note Prayer Walkie-Talkie',
+    'Record prayer voice notes while walking or driving; the app transcribes and organizes prayers by theme over time.',
     'Prayer'
   ),
   (
-    'Gradual Learning Progression',
-    'Start slow and build up naturally so new readers never feel overwhelmed or lost.',
-    'Learning'
-  ),
-  (
-    'Address Core Pain Points',
-    'Tackle the real struggles: doubt, shame, consistency, discipline, and questions about faith itself.',
+    'Offline Mode',
+    'Bible access and key features remain available without internet, so you can read and study anywhere.',
     'Content'
   ),
   (
-    'Interactive Story Experience',
-    'Experience Bible narratives as interactive journeys where you make decisions and see outcomes.',
-    'Learning'
+    'Prayer List and Reminders',
+    'Create prayer requests, track answered prayers, and set reminders to pray for specific people or needs.',
+    'Prayer'
   ),
   (
-    'Made for Everyone',
-    'Designed for all ages and backgrounds, including middle-aged women who often get overlooked.',
+    'Community Study Groups',
+    'Group-based study plans where people follow the same passages together, comment, discuss, and grow as a community.',
     'Community'
+  ),
+  (
+    'Simplify the Bible in a Modern Way',
+    'Clear explanations and structured presentation that make Scripture easier to understand without watering it down.',
+    'Content'
+  ),
+  (
+    'Slow Build-Up to Learning',
+    'A gradual progression system for new readers that starts simple and increases depth over time.',
+    'Learning'
   );

@@ -471,43 +471,36 @@ export default function SwipeDeck() {
                       placeholder="Your thoughts..."
                       className="h-40 w-full resize-none rounded-2xl border border-[#D8E3E8] bg-white px-4 py-3 text-sm text-[#4A7B9D] shadow-sm"
                     />
-                    <div className="space-y-2">
-                      <p className="text-center text-xs font-semibold text-[#4A7B9D]">
-                        Rate this feature (1-5)
-                      </p>
-                      <div className="flex items-center justify-center gap-2">
-                        {[1, 2, 3, 4, 5].map((value) => {
-                          const isSelected = currentRating === value;
-                          return (
-                            <button
-                              key={value}
-                              type="button"
-                              onClick={() => handleRatingSelect(value)}
-                              aria-pressed={isSelected}
-                              className={`h-9 w-9 rounded-full border text-sm font-semibold transition ${
-                                isSelected
-                                  ? "border-[#8FC5E8] bg-[#8FC5E8] text-white"
-                                  : "border-[#D8E3E8] bg-white text-[#6B7A84]"
-                              }`}
-                            >
-                              {value}
-                            </button>
-                          );
-                        })}
-                      </div>
+                  </div>
+                  <div className="flex flex-1 flex-col items-center justify-center gap-4">
+                    <p className="text-center text-base font-semibold text-[#4A7B9D]">
+                      Rate this feature (1-5)
+                    </p>
+                    <div className="flex items-center justify-center gap-4">
+                      {[1, 2, 3, 4, 5].map((value) => {
+                        const isSelected = currentRating === value;
+                        return (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => handleRatingSelect(value)}
+                            aria-pressed={isSelected}
+                            className={`h-14 w-14 rounded-full border text-lg font-semibold transition ${
+                              isSelected
+                                ? "border-[#8FC5E8] bg-[#8FC5E8] text-white"
+                                : "border-[#D8E3E8] bg-white text-[#6B7A84]"
+                            }`}
+                          >
+                            {value}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
-                  <div className="mt-auto flex flex-col gap-2">
+                  <div className="flex flex-col gap-2">
                     <p className="text-center text-xs text-[#9BA8B0]">
                       Your feedback is saved with your yes/no/maybe response.
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setIsFlipped(false)}
-                      className="w-full rounded-2xl bg-[#F5D5C8] px-4 py-3 text-sm font-semibold text-[#2E5B7A] shadow-sm transition hover:-translate-y-0.5"
-                    >
-                      Submit feedback
-                    </button>
                   </div>
                 </div>
               </div>
