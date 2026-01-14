@@ -28,7 +28,7 @@ async function getExpectedSessionValue() {
     .join("");
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isAdminApiLogin =
     pathname.startsWith("/api/admin/login") ||
