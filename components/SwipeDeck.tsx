@@ -297,8 +297,8 @@ const isRecentCommunityFeature = (createdAt: string) => {
 };
 
 const buildCommunityQueue = (items: CommunityFeature[]) => {
-  const recent = [];
-  const older = [];
+  const recent: CommunityFeature[] = [];
+  const older: CommunityFeature[] = [];
   items.forEach((item) => {
     if (isRecentCommunityFeature(item.createdAt)) {
       recent.push(item);
