@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { PointerEvent as ReactPointerEvent } from "react";
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { Check, X } from "lucide-react";
 import Filter from "bad-words";
 
@@ -578,7 +578,7 @@ export default function SwipeDeck() {
   const isSubmissionCard = cardView === "submission";
   const isCommunityFeature = currentFeature?.source === "community";
 
-  const cardTransitionStyle = useMemo(
+  const cardTransitionStyle = useMemo<CSSProperties>(
     () => ({
       opacity: isCardHidden ? 0 : 1,
       transform: isCardHidden ? "translateY(12px)" : "translateY(0px)",
