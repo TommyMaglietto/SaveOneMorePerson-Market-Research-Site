@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 import { getSupabaseAdmin } from "@/lib/supabase";
 
-const REPORT_THRESHOLD = 15;
+const REPORT_THRESHOLD = 1;
 const REPORT_MAX_PER_DAY = 10;
 const REPORT_COOLDOWN_MS = 15 * 1000;
 const REPORT_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -136,30 +136,20 @@ export async function POST(request: Request) {
   const currentCount = feature.reported_count ?? 0;
   const nextCount = currentCount + 1;
 
-  if (nextCount >= REPORT_THRESHOLD) {
-    const { error: deleteError } = await getSupabaseAdmin()
-      .from("CommunityFeatures")
-      .delete()
-      .eq("id", featureId);
+  const updatePayload =
+    nextCount >= REPORT_THRESHOLD
+      ? { reported_count: nextCount, allowed: false }
+      : { reported_count: nextCount };
+  const { error: updateError } = await getSupabaseAdmin()
+    .from("CommunityFeatures")
+    .update(updatePayload)
+    .eq("id", featureId);
 
-    if (deleteError) {
-      return NextResponse.json(
-        { error: "Failed to process report." },
-        { status: 500 },
-      );
-    }
-  } else {
-    const { error: updateError } = await getSupabaseAdmin()
-      .from("CommunityFeatures")
-      .update({ reported_count: nextCount })
-      .eq("id", featureId);
-
-    if (updateError) {
-      return NextResponse.json(
-        { error: "Failed to process report." },
-        { status: 500 },
-      );
-    }
+  if (updateError) {
+    return NextResponse.json(
+      { error: "Failed to process report." },
+      { status: 500 },
+    );
   }
 
   commitRateLimit(reportByIp, ipHash, ipEntry, now);

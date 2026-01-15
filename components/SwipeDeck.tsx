@@ -559,8 +559,7 @@ export default function SwipeDeck() {
       (feature) => !initialVotedIds.has(feature.id),
     );
     const availableCommunity = communityFeatures.filter(
-      (feature) =>
-        !initialVotedIds.has(feature.id) && feature.reportedCount < 15,
+      (feature) => !initialVotedIds.has(feature.id),
     );
     const builtDeck = buildDeck(
       availableOfficial,
@@ -1208,13 +1207,10 @@ export default function SwipeDeck() {
                           aria-label="Report for abuse"
                           aria-expanded={isReportModalOpen}
                           onClick={handleReportClick}
-                          className={`flex items-center gap-2 rounded-full border border-[#9BA8B0] px-3 py-1 text-[#9BA8B0] shadow-sm transition hover:-translate-y-0.5 ${
+                          className={`flex h-6 w-6 items-center justify-center rounded-full border border-[#9BA8B0] text-[#9BA8B0] shadow-sm transition hover:-translate-y-0.5 ${
                             isReportModalOpen ? "bg-[#D8E3E8]" : "bg-white/80"
                           }`}
                         >
-                          <span className="whitespace-nowrap text-[11px] font-semibold text-[#9BA8B0]">
-                            Report for abuse?
-                          </span>
                           <AlertCircle
                             size={14}
                             strokeWidth={2}
@@ -1241,7 +1237,7 @@ export default function SwipeDeck() {
                             <X size={12} strokeWidth={2.5} />
                           </button>
                           <p className="text-sm font-semibold text-[#2E5B7A]">
-                            Why do you want to report this card?
+                            Want to submit a report?
                           </p>
                           <p className="text-xs text-[#6B7A84]">
                             Use this if the submission feels abusive or unsafe.

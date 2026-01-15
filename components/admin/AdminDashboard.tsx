@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { Check, X } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -71,6 +72,15 @@ type CommentItem = {
   created_at: string | null;
 };
 
+type ModerationItem = {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  createdAt: string | null;
+  reportedCount: number;
+};
+
 const COMMENTS_PAGE_SIZE = 5;
 
 const bucketOptions = [
@@ -85,6 +95,16 @@ export default function AdminDashboard() {
   const [communitySummary, setCommunitySummary] = useState<
     CommunityFeatureSummary[]
   >([]);
+  const [flaggedFeatures, setFlaggedFeatures] = useState<ModerationItem[]>([]);
+  const [moderationStatus, setModerationStatus] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
+  const [moderationMessage, setModerationMessage] = useState<string | null>(
+    null,
+  );
+  const [moderationActionById, setModerationActionById] = useState<
+    Record<string, "approve" | "reject">
+  >({});
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null);
   const [distribution, setDistribution] = useState<DistributionItem[]>([]);
   const [ratingDistribution, setRatingDistribution] = useState<
@@ -251,6 +271,52 @@ export default function AdminDashboard() {
   }, [router]);
 
   useEffect(() => {
+    const loadModeration = async () => {
+      try {
+        setModerationStatus("loading");
+        setModerationMessage(null);
+        const response = await fetch("/api/admin/moderation", {
+          credentials: "include",
+        });
+        if (response.status === 401) {
+          router.push("/admin/login");
+          return;
+        }
+        if (!response.ok) {
+          throw new Error("Unable to load moderation queue.");
+        }
+        const data = (await response.json()) as {
+          features: {
+            id: string;
+            name: string;
+            description: string | null;
+            category: string | null;
+            created_at: string | null;
+            reported_count: number | null;
+          }[];
+        };
+        const normalized =
+          data.features?.map((feature) => ({
+            id: feature.id,
+            name: feature.name,
+            description: feature.description,
+            category: feature.category,
+            createdAt: feature.created_at,
+            reportedCount: feature.reported_count ?? 0,
+          })) ?? [];
+        setFlaggedFeatures(normalized);
+        setModerationStatus("ready");
+      } catch {
+        setFlaggedFeatures([]);
+        setModerationStatus("error");
+        setModerationMessage("Unable to load flagged submissions.");
+      }
+    };
+
+    loadModeration();
+  }, [router]);
+
+  useEffect(() => {
     const loadDetails = async () => {
       if (!selectedFeatureId) return;
       try {
@@ -373,6 +439,39 @@ export default function AdminDashboard() {
       return { label: "No", bg: "#F5D5C8", color: "#7A5B4A" };
     }
     return { label: "Unscored", bg: "#E8F4F8", color: "#6B7A84" };
+  };
+
+  const handleModerationAction = async (
+    featureId: string,
+    action: "approve" | "reject",
+  ) => {
+    setModerationActionById((prev) => ({ ...prev, [featureId]: action }));
+    setModerationMessage(null);
+    try {
+      const response = await fetch(`/api/admin/moderation/${action}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ featureId }),
+      });
+      if (response.status === 401) {
+        router.push("/admin/login");
+        return;
+      }
+      if (!response.ok) {
+        throw new Error("Unable to update moderation status.");
+      }
+      setFlaggedFeatures((prev) =>
+        prev.filter((feature) => feature.id !== featureId),
+      );
+    } catch {
+      setModerationMessage("Unable to update moderation status.");
+    } finally {
+      setModerationActionById((prev) => {
+        const { [featureId]: _removed, ...rest } = prev;
+        return rest;
+      });
+    }
   };
 
   const handleLogout = async () => {
@@ -841,6 +940,113 @@ export default function AdminDashboard() {
                         <p className="text-xs text-[#9BA8B0]">
                           {item.count} responses
                         </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="card-surface p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-semibold text-[#6B7A84]">
+                  Moderation queue
+                </p>
+                <span className="rounded-full bg-[#F5D5C8] px-3 py-1 text-xs font-semibold text-[#7A5B4A]">
+                  {flaggedFeatures.length} flagged
+                </span>
+              </div>
+            </div>
+
+            {moderationMessage && moderationStatus !== "error" && (
+              <p className="text-sm font-semibold text-rose-500">
+                {moderationMessage}
+              </p>
+            )}
+
+            {moderationStatus === "loading" && (
+              <p className="text-sm text-[#9BA8B0]">
+                Loading flagged submissions...
+              </p>
+            )}
+
+            {moderationStatus === "error" && (
+              <p className="text-sm font-semibold text-rose-500">
+                {moderationMessage ?? "Unable to load flagged submissions."}
+              </p>
+            )}
+
+            {moderationStatus === "ready" && flaggedFeatures.length === 0 && (
+              <p className="text-sm text-[#9BA8B0]">
+                No community submissions are awaiting review.
+              </p>
+            )}
+
+            {moderationStatus === "ready" && flaggedFeatures.length > 0 && (
+              <div className="space-y-3">
+                {flaggedFeatures.map((feature) => {
+                  const createdLabel = formatDate(feature.createdAt);
+                  const isModerating = Boolean(moderationActionById[feature.id]);
+                  const reportLabel = `${feature.reportedCount} report${
+                    feature.reportedCount === 1 ? "" : "s"
+                  }`;
+                  return (
+                    <div
+                      key={feature.id}
+                      className="rounded-2xl border border-[#D8E3E8] bg-white px-4 py-4 shadow-sm"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div className="min-w-0 space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-[#E0D4F5] px-3 py-1 text-xs font-semibold text-[#4A7B9D]">
+                              {feature.category ?? "General"}
+                            </span>
+                            <span className="rounded-full bg-[#F5D5C8] px-3 py-1 text-xs font-semibold text-[#7A5B4A]">
+                              {reportLabel}
+                            </span>
+                          </div>
+                          <p className="font-semibold text-[#2E5B7A]">
+                            {feature.name}
+                          </p>
+                          {feature.description && (
+                            <p className="text-sm text-[#6B7A84]">
+                              {feature.description}
+                            </p>
+                          )}
+                          {createdLabel && (
+                            <p className="text-xs text-[#9BA8B0]">
+                              Submitted {createdLabel}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleModerationAction(feature.id, "approve")
+                            }
+                            disabled={isModerating}
+                            aria-label={`Approve ${feature.name}`}
+                            title="Approve"
+                            className="flex h-[60px] w-[60px] items-center justify-center rounded-full bg-[#3D6B43] text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#2F5236] disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <Check size={26} strokeWidth={2.5} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleModerationAction(feature.id, "reject")
+                            }
+                            disabled={isModerating}
+                            aria-label={`Reject ${feature.name}`}
+                            title="Reject"
+                            className="flex h-[60px] w-[60px] items-center justify-center rounded-full bg-[#D86161] text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#C45151] disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <X size={26} strokeWidth={2.5} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );

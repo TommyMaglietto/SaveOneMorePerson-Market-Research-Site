@@ -135,6 +135,7 @@ export async function GET(request: Request) {
   const { data, error } = await getSupabaseAdmin()
     .from("CommunityFeatures")
     .select("id, name, description, category, created_at, reported_count")
+    .or("and(allowed.eq.true,greenlit.is.null),greenlit.eq.true")
     .order("created_at", { ascending: false })
     .limit(limit);
 
