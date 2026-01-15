@@ -389,6 +389,7 @@ export default function SwipeDeck() {
   const [submissionCategory, setSubmissionCategory] = useState<
     SubmissionCategory | ""
   >("");
+  const [submissionHoneypot, setSubmissionHoneypot] = useState("");
   const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
   const [submissionMessageTone, setSubmissionMessageTone] = useState<
     "success" | "error"
@@ -413,6 +414,7 @@ export default function SwipeDeck() {
   const timeoutRef = useRef<number | null>(null);
   const cardTransitionRef = useRef<number | null>(null);
   const submissionResetRef = useRef<number | null>(null);
+  const submissionStartRef = useRef<number | null>(null);
   const didLoadSelections = useRef(false);
   const rotationStepRef = useRef(0);
 
@@ -698,9 +700,12 @@ export default function SwipeDeck() {
       window.clearTimeout(submissionResetRef.current);
     }
     if (cardView === "submission") {
+      submissionStartRef.current = null;
       switchCardView("feature");
       return;
     }
+    submissionStartRef.current = Date.now();
+    setSubmissionHoneypot("");
     switchCardView("submission");
   };
 
@@ -831,6 +836,10 @@ export default function SwipeDeck() {
     }
   };
 
+  const handleSubmissionHoneypotChange = (value: string) => {
+    setSubmissionHoneypot(value);
+  };
+
   const handleSubmissionCategoryChange = (value: SubmissionCategory | "") => {
     setSubmissionCategory(value);
     if (submissionMessage) {
@@ -863,11 +872,28 @@ export default function SwipeDeck() {
     setSubmissionMessage(null);
     setSubmissionMessageTone("success");
 
+    let timezone = "";
+    try {
+      timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
+    } catch {
+      timezone = "";
+    }
+    const clientTimeMs = submissionStartRef.current
+      ? Date.now() - submissionStartRef.current
+      : null;
+
     try {
       const response = await fetch("/api/community-features", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, description, category }),
+        body: JSON.stringify({
+          name,
+          description,
+          category,
+          honeypot: submissionHoneypot,
+          clientTimeMs,
+          timezone,
+        }),
       });
       if (!response.ok) {
         throw new Error("Failed to submit.");
@@ -877,12 +903,14 @@ export default function SwipeDeck() {
       setSubmissionName("");
       setSubmissionDescription("");
       setSubmissionCategory("");
+      setSubmissionHoneypot("");
       setProfanityFlags({ name: false, description: false });
       if (submissionResetRef.current) {
         window.clearTimeout(submissionResetRef.current);
       }
       submissionResetRef.current = window.setTimeout(() => {
         setSubmissionMessage(null);
+        submissionStartRef.current = null;
         switchCardView("feature");
       }, 1400);
     } catch {
@@ -1120,6 +1148,17 @@ export default function SwipeDeck() {
         {status === "ready" && isSubmissionCard && (
           <div className="absolute inset-0 h-full w-full" style={cardTransitionStyle}>
             <div className="card-surface flex h-full w-full flex-col gap-4 p-6">
+              <input
+                name="company"
+                value={submissionHoneypot}
+                onChange={(event) =>
+                  handleSubmissionHoneypotChange(event.target.value)
+                }
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                className="sr-only"
+              />
               <div className="space-y-2">
                 <label
                   htmlFor="community-feature-name"
