@@ -29,6 +29,21 @@ type FeatureSummary = {
   commentCount: number;
 };
 
+type CommunityFeatureSummary = {
+  featureId: string;
+  name: string;
+  category: string | null;
+  createdAt: string | null;
+  count: number;
+  averageScore: number;
+  yesCount: number;
+  maybeCount: number;
+  noCount: number;
+  ratingCount: number;
+  averageRating: number;
+  commentCount: number;
+};
+
 type DistributionItem = {
   score: number;
   label: string;
@@ -67,6 +82,9 @@ const bucketOptions = [
 export default function AdminDashboard() {
   const router = useRouter();
   const [summary, setSummary] = useState<FeatureSummary[]>([]);
+  const [communitySummary, setCommunitySummary] = useState<
+    CommunityFeatureSummary[]
+  >([]);
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null);
   const [distribution, setDistribution] = useState<DistributionItem[]>([]);
   const [ratingDistribution, setRatingDistribution] = useState<
@@ -85,6 +103,13 @@ export default function AdminDashboard() {
   );
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [message, setMessage] = useState<string | null>(null);
+  const [communityStatus, setCommunityStatus] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
+  const [communityMessage, setCommunityMessage] = useState<string | null>(null);
+  const [communitySortBy, setCommunitySortBy] = useState<
+    "popular" | "controversial" | "rated" | "feedback"
+  >("popular");
   const [sortBy, setSortBy] = useState<
     "popular" | "controversial" | "rated" | "feedback"
   >("popular");
@@ -135,6 +160,36 @@ export default function AdminDashboard() {
     });
   }, [sortBy, summary]);
 
+  const sortedCommunitySummary = useMemo(() => {
+    const data = [...communitySummary];
+    if (communitySortBy === "popular") {
+      return data.sort((a, b) =>
+        b.averageScore === a.averageScore
+          ? b.count - a.count
+          : b.averageScore - a.averageScore,
+      );
+    }
+    if (communitySortBy === "rated") {
+      return data.sort((a, b) =>
+        b.averageRating === a.averageRating
+          ? b.ratingCount - a.ratingCount
+          : b.averageRating - a.averageRating,
+      );
+    }
+    if (communitySortBy === "feedback") {
+      return data.sort((a, b) =>
+        b.commentCount === a.commentCount
+          ? b.count - a.count
+          : b.commentCount - a.commentCount,
+      );
+    }
+    return data.sort((a, b) => {
+      const scoreDiff = getControversyScore(b) - getControversyScore(a);
+      if (scoreDiff !== 0) return scoreDiff;
+      return b.count - a.count;
+    });
+  }, [communitySortBy, communitySummary]);
+
   useEffect(() => {
     const loadSummary = async () => {
       try {
@@ -162,6 +217,37 @@ export default function AdminDashboard() {
     };
 
     loadSummary();
+  }, [router]);
+
+  useEffect(() => {
+    const loadCommunitySummary = async () => {
+      try {
+        setCommunityStatus("loading");
+        setCommunityMessage(null);
+        const response = await fetch(
+          "/api/admin/summary/community-feature-ratings",
+          { credentials: "include" },
+        );
+        if (response.status === 401) {
+          router.push("/admin/login");
+          return;
+        }
+        if (!response.ok) {
+          throw new Error("Unable to load community summary.");
+        }
+        const data = (await response.json()) as {
+          summary: CommunityFeatureSummary[];
+        };
+        setCommunitySummary(data.summary ?? []);
+        setCommunityStatus("ready");
+      } catch {
+        setCommunitySummary([]);
+        setCommunityStatus("error");
+        setCommunityMessage("Unable to load community features.");
+      }
+    };
+
+    loadCommunitySummary();
   }, [router]);
 
   useEffect(() => {
@@ -660,6 +746,107 @@ export default function AdminDashboard() {
                 );
               })}
             </div>
+          </div>
+
+          <div className="card-surface p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-semibold text-[#6B7A84]">
+                  Community feature ratings
+                </p>
+                <span className="rounded-full bg-[#E8F4F8] px-3 py-1 text-xs font-semibold text-[#6B7A84]">
+                  {communitySummary.length} submissions
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <label className="font-semibold text-[#9BA8B0]">Sort</label>
+                <select
+                  className="rounded-full border border-[#D8E3E8] bg-white px-3 py-1.5 text-sm"
+                  value={communitySortBy}
+                  onChange={(event) =>
+                    setCommunitySortBy(
+                      event.target.value as
+                        | "popular"
+                        | "controversial"
+                        | "rated"
+                        | "feedback",
+                    )
+                  }
+                >
+                  <option value="popular">Most popular</option>
+                  <option value="controversial">Most controversial</option>
+                  <option value="rated">Best rated</option>
+                  <option value="feedback">Most feedback</option>
+                </select>
+              </div>
+            </div>
+
+            {communityStatus === "loading" && (
+              <p className="text-sm text-[#9BA8B0]">
+                Loading community features...
+              </p>
+            )}
+
+            {communityStatus === "error" && (
+              <p className="text-sm font-semibold text-rose-500">
+                {communityMessage ?? "Unable to load community features."}
+              </p>
+            )}
+
+            {communityStatus === "ready" && communitySummary.length === 0 && (
+              <p className="text-sm text-[#9BA8B0]">
+                No community submissions yet.
+              </p>
+            )}
+
+            {communityStatus === "ready" && communitySummary.length > 0 && (
+              <div className="space-y-2 text-sm text-[#6B7A84]">
+                {sortedCommunitySummary.map((item) => {
+                  const yesPercent = getPercent(item.yesCount, item.count);
+                  const maybePercent = getPercent(item.maybeCount, item.count);
+                  const noPercent = getPercent(item.noCount, item.count);
+                  const ratingCoverage = getPercent(item.ratingCount, item.count);
+                  const commentCoverage = getPercent(item.commentCount, item.count);
+                  const createdLabel = formatDate(item.createdAt);
+                  return (
+                    <div
+                      key={item.featureId}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#D8E3E8] bg-white px-3 py-3"
+                    >
+                      <div>
+                        <p className="font-semibold text-[#2E5B7A]">
+                          {item.name}
+                        </p>
+                        <p className="text-xs text-[#9BA8B0]">
+                          {item.category ?? "General"}
+                        </p>
+                        <p className="mt-1 text-xs text-[#9BA8B0]">
+                          Yes {yesPercent}% | Maybe {maybePercent}% | No{" "}
+                          {noPercent}%
+                        </p>
+                        <p className="text-xs text-[#9BA8B0]">
+                          Rating {item.averageRating.toFixed(2)} | Rated{" "}
+                          {ratingCoverage}% | Comments {commentCoverage}%
+                        </p>
+                        {createdLabel && (
+                          <p className="text-xs text-[#9BA8B0]">
+                            Submitted {createdLabel}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-[#4A7B9D]">
+                          {item.averageScore.toFixed(2)}
+                        </p>
+                        <p className="text-xs text-[#9BA8B0]">
+                          {item.count} responses
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </>
       )}
