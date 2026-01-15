@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
-import { Check, X } from "lucide-react";
+import { AlertCircle, Check, X } from "lucide-react";
 import Filter from "bad-words";
 
 type FeatureBase = {
@@ -15,11 +15,13 @@ type FeatureBase = {
 
 type CommunityFeature = FeatureBase & {
   createdAt: string;
+  reportedCount: number;
 };
 
 type DeckItem = FeatureBase & {
   source: "official" | "community";
   createdAt?: string;
+  reportedCount?: number;
 };
 
 type Selection = {
@@ -48,6 +50,10 @@ const ROTATION_STEP_KEY = "somp-rotation-step";
 const SWIPE_THRESHOLD = 80;
 const COMMUNITY_BATCH_SIZE = 20;
 const COMMUNITY_NEW_DAYS = 7;
+const SUBMISSION_NAME_MIN = 3;
+const SUBMISSION_NAME_MAX = 80;
+const SUBMISSION_DESCRIPTION_MIN = 10;
+const SUBMISSION_DESCRIPTION_MAX = 500;
 
 const shuffleFeatures = <T,>(items: T[]) => {
   const shuffled = [...items];
@@ -296,6 +302,19 @@ const isRecentCommunityFeature = (createdAt: string) => {
   return ageMs <= COMMUNITY_NEW_DAYS * 24 * 60 * 60 * 1000;
 };
 
+const getReportedCount = (item: CommunityFeature) =>
+  Math.max(0, item.reportedCount ?? 0);
+
+const weightedShuffleCommunity = (items: CommunityFeature[]) => {
+  const scored = items.map((item) => {
+    const weight = Math.max(0.05, 1 / (1 + getReportedCount(item)));
+    const key = Math.pow(Math.random(), 1 / weight);
+    return { item, key };
+  });
+  scored.sort((a, b) => b.key - a.key);
+  return scored.map((entry) => entry.item);
+};
+
 const buildCommunityQueue = (items: CommunityFeature[]) => {
   const recent: CommunityFeature[] = [];
   const older: CommunityFeature[] = [];
@@ -306,8 +325,8 @@ const buildCommunityQueue = (items: CommunityFeature[]) => {
       older.push(item);
     }
   });
-  const recentQueue = shuffleFeatures(recent);
-  const olderQueue = shuffleFeatures(older);
+  const recentQueue = weightedShuffleCommunity(recent);
+  const olderQueue = weightedShuffleCommunity(older);
   const blended: CommunityFeature[] = [];
   while (recentQueue.length || olderQueue.length) {
     if (recentQueue.length) {
@@ -399,6 +418,12 @@ export default function SwipeDeck() {
     description: false,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isReporting, setIsReporting] = useState(false);
+  const [reportMessage, setReportMessage] = useState<string | null>(null);
+  const [reportMessageTone, setReportMessageTone] = useState<
+    "idle" | "success" | "error"
+  >("idle");
   const [initialVotedIds, setInitialVotedIds] = useState<Set<string> | null>(
     null,
   );
@@ -415,6 +440,7 @@ export default function SwipeDeck() {
   const cardTransitionRef = useRef<number | null>(null);
   const submissionResetRef = useRef<number | null>(null);
   const submissionStartRef = useRef<number | null>(null);
+  const reportResetRef = useRef<number | null>(null);
   const didLoadSelections = useRef(false);
   const rotationStepRef = useRef(0);
 
@@ -461,6 +487,7 @@ export default function SwipeDeck() {
             description: string | null;
             category: string | null;
             created_at: string;
+            reported_count: number | null;
           }[];
         };
         if (!active) return;
@@ -471,6 +498,7 @@ export default function SwipeDeck() {
             description: item.description,
             category: item.category,
             createdAt: item.created_at,
+            reportedCount: item.reported_count ?? 0,
           })) ?? [];
         setCommunityFeatures(normalized);
       } catch {
@@ -531,7 +559,8 @@ export default function SwipeDeck() {
       (feature) => !initialVotedIds.has(feature.id),
     );
     const availableCommunity = communityFeatures.filter(
-      (feature) => !initialVotedIds.has(feature.id),
+      (feature) =>
+        !initialVotedIds.has(feature.id) && feature.reportedCount < 15,
     );
     const builtDeck = buildDeck(
       availableOfficial,
@@ -562,6 +591,9 @@ export default function SwipeDeck() {
       if (submissionResetRef.current) {
         window.clearTimeout(submissionResetRef.current);
       }
+      if (reportResetRef.current) {
+        window.clearTimeout(reportResetRef.current);
+      }
     },
     [],
   );
@@ -579,6 +611,17 @@ export default function SwipeDeck() {
     !isCardHidden;
   const isSubmissionCard = cardView === "submission";
   const isCommunityFeature = currentFeature?.source === "community";
+
+  useEffect(() => {
+    setIsReportModalOpen(false);
+    setReportMessage(null);
+    setReportMessageTone("idle");
+    setIsReporting(false);
+    if (reportResetRef.current) {
+      window.clearTimeout(reportResetRef.current);
+      reportResetRef.current = null;
+    }
+  }, [currentFeature?.id]);
 
   const cardTransitionStyle = useMemo<CSSProperties>(
     () => ({
@@ -696,6 +739,14 @@ export default function SwipeDeck() {
     setSubmissionMessage(null);
     setSubmissionMessageTone("success");
     setProfanityFlags({ name: false, description: false });
+    setIsReportModalOpen(false);
+    setReportMessage(null);
+    setReportMessageTone("idle");
+    setIsReporting(false);
+    if (reportResetRef.current) {
+      window.clearTimeout(reportResetRef.current);
+      reportResetRef.current = null;
+    }
     if (submissionResetRef.current) {
       window.clearTimeout(submissionResetRef.current);
     }
@@ -840,6 +891,68 @@ export default function SwipeDeck() {
     setSubmissionHoneypot(value);
   };
 
+  const closeReportModal = () => {
+    if (reportResetRef.current) {
+      window.clearTimeout(reportResetRef.current);
+      reportResetRef.current = null;
+    }
+    setIsReportModalOpen(false);
+    setReportMessage(null);
+    setReportMessageTone("idle");
+    setIsReporting(false);
+  };
+
+  const handleReportClick = () => {
+    if (!isCommunityFeature) return;
+    if (isReportModalOpen) {
+      closeReportModal();
+      return;
+    }
+    setReportMessage(null);
+    setReportMessageTone("idle");
+    setIsReporting(false);
+    setIsReportModalOpen(true);
+  };
+
+  const handleSubmitReport = async () => {
+    if (!currentFeature || !isCommunityFeature || isReporting) return;
+    setIsReporting(true);
+    setReportMessage(null);
+    setReportMessageTone("idle");
+    const reportId = currentFeature.id;
+
+    let timezone = "";
+    try {
+      timezone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
+    } catch {
+      timezone = "";
+    }
+
+    try {
+      const response = await fetch("/api/community-features/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ featureId: currentFeature.id, timezone }),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to report.");
+      }
+      setReportMessage("Thanks for helping keep things safe.");
+      setReportMessageTone("success");
+      if (reportResetRef.current) {
+        window.clearTimeout(reportResetRef.current);
+      }
+      reportResetRef.current = window.setTimeout(() => {
+        setDeck((prev) => prev.filter((item) => item.id !== reportId));
+        closeReportModal();
+      }, 2000);
+    } catch {
+      setReportMessage("We couldn't submit that report. Please try again.");
+      setReportMessageTone("error");
+      setIsReporting(false);
+    }
+  };
+
   const handleSubmissionCategoryChange = (value: SubmissionCategory | "") => {
     setSubmissionCategory(value);
     if (submissionMessage) {
@@ -855,6 +968,38 @@ export default function SwipeDeck() {
     const category = submissionCategory;
 
     if (!name || !description || !category) return;
+
+    if (name.length < SUBMISSION_NAME_MIN) {
+      setSubmissionMessage(
+        `Feature name should be at least ${SUBMISSION_NAME_MIN} characters.`,
+      );
+      setSubmissionMessageTone("error");
+      return;
+    }
+
+    if (description.length < SUBMISSION_DESCRIPTION_MIN) {
+      setSubmissionMessage(
+        `Please add more detail (at least ${SUBMISSION_DESCRIPTION_MIN} characters).`,
+      );
+      setSubmissionMessageTone("error");
+      return;
+    }
+
+    if (name.length > SUBMISSION_NAME_MAX) {
+      setSubmissionMessage(
+        `Feature name should be under ${SUBMISSION_NAME_MAX} characters.`,
+      );
+      setSubmissionMessageTone("error");
+      return;
+    }
+
+    if (description.length > SUBMISSION_DESCRIPTION_MAX) {
+      setSubmissionMessage(
+        `Description should be under ${SUBMISSION_DESCRIPTION_MAX} characters.`,
+      );
+      setSubmissionMessageTone("error");
+      return;
+    }
 
     const nameProfane = containsProfanity(name, profanityFilter);
     const descriptionProfane = containsProfanity(description, profanityFilter);
@@ -896,7 +1041,24 @@ export default function SwipeDeck() {
         }),
       });
       if (!response.ok) {
-        throw new Error("Failed to submit.");
+        const errorPayload = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        const errorText =
+          typeof errorPayload?.error === "string"
+            ? errorPayload.error
+            : null;
+        if (errorText === "Submission length is invalid.") {
+          setSubmissionMessage(
+            `Please add more detail (at least ${SUBMISSION_DESCRIPTION_MIN} characters).`,
+          );
+        } else if (errorText) {
+          setSubmissionMessage(errorText);
+        } else {
+          setSubmissionMessage("We couldn't submit right now. Please try again.");
+        }
+        setSubmissionMessageTone("error");
+        return;
       }
       setSubmissionMessage("Thanks! Your idea has been submitted!");
       setSubmissionMessageTone("success");
@@ -1028,17 +1190,86 @@ export default function SwipeDeck() {
                     pointerEvents: isFlipped ? "none" : "auto",
                   }}
                 >
-                  {isCommunityFeature && (
-                    <span className="absolute right-4 top-4 z-10 rounded-[12px] bg-[#C8E3F5] px-3 py-1 text-[11px] font-medium text-[#4A7B9D] shadow-[0_2px_4px_rgba(74,123,157,0.15)] font-[var(--font-poppins)]">
-                      Community Made
-                    </span>
-                  )}
                   <div className="space-y-4">
-                    <div className="flex items-center justify-start">
-                      <span className="whitespace-nowrap rounded-full bg-[#E0D4F5] px-3 py-1 text-xs font-semibold text-[#4A7B9D]">
-                        {currentFeature.category ?? "General"}
-                      </span>
+                    <div className="flex w-full flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="whitespace-nowrap rounded-full bg-[#E0D4F5] px-3 py-1 text-xs font-semibold text-[#4A7B9D]">
+                          {currentFeature.category ?? "General"}
+                        </span>
+                        {isCommunityFeature && (
+                          <span className="rounded-[12px] bg-[#C8E3F5] px-3 py-1 text-[11px] font-medium text-[#4A7B9D] shadow-[0_2px_4px_rgba(74,123,157,0.15)] font-[var(--font-poppins)]">
+                            Community Made
+                          </span>
+                        )}
+                      </div>
+                      {isCommunityFeature && (
+                        <button
+                          type="button"
+                          aria-label="Report for abuse"
+                          aria-expanded={isReportModalOpen}
+                          onClick={handleReportClick}
+                          className={`flex items-center gap-2 rounded-full border border-[#9BA8B0] px-3 py-1 text-[#9BA8B0] shadow-sm transition hover:-translate-y-0.5 ${
+                            isReportModalOpen ? "bg-[#D8E3E8]" : "bg-white/80"
+                          }`}
+                        >
+                          <span className="whitespace-nowrap text-[11px] font-semibold text-[#9BA8B0]">
+                            Report for abuse?
+                          </span>
+                          <AlertCircle
+                            size={14}
+                            strokeWidth={2}
+                            className="text-[#6B7A84]"
+                          />
+                        </button>
+                      )}
                     </div>
+                    {isCommunityFeature && isReportModalOpen && (
+                      <div
+                        className="absolute inset-0 z-20 flex items-center justify-center rounded-[20px] bg-white/70 p-4 backdrop-blur-[2px]"
+                        onClick={closeReportModal}
+                      >
+                        <div
+                          className="card-surface relative w-full max-w-xs space-y-3 p-4 text-center"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            aria-label="Close report dialog"
+                            onClick={closeReportModal}
+                            className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border border-[#F5A3A3] bg-white text-[#D86161] shadow-sm transition hover:-translate-y-0.5"
+                          >
+                            <X size={12} strokeWidth={2.5} />
+                          </button>
+                          <p className="text-sm font-semibold text-[#2E5B7A]">
+                            Why do you want to report this card?
+                          </p>
+                          <p className="text-xs text-[#6B7A84]">
+                            Use this if the submission feels abusive or unsafe.
+                          </p>
+                          {reportMessage && (
+                            <p
+                              className={`text-xs font-semibold ${
+                                reportMessageTone === "error"
+                                  ? "text-[#D9967A]"
+                                  : "text-[#3D6B43]"
+                              }`}
+                            >
+                              {reportMessage}
+                            </p>
+                          )}
+                          {reportMessageTone !== "success" && (
+                            <button
+                              type="button"
+                              onClick={handleSubmitReport}
+                              disabled={isReporting}
+                              className="w-full rounded-full bg-[#F5A3A3] px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {isReporting ? "Submitting..." : "Submit report"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     <div className="space-y-3">
                       <h2 className="text-center font-heading text-2xl font-semibold text-[#2E5B7A]">
                         {currentFeature.name}
