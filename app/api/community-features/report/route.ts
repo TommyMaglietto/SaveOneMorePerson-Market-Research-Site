@@ -1,6 +1,13 @@
 import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 
+import {
+  commitRateLimit,
+  getRateLimitEntry,
+  getRateLimitError,
+  pruneRateLimitEntries,
+  type RateLimitEntry,
+} from "@/lib/rate-limit";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 const REPORT_THRESHOLD = 1;
@@ -8,21 +15,17 @@ const REPORT_MAX_PER_DAY = 10;
 const REPORT_COOLDOWN_MS = 15 * 1000;
 const REPORT_WINDOW_MS = 24 * 60 * 60 * 1000;
 const REPORT_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+const REPORT_IP_SCOPE = "community-report-ip";
+const REPORT_FINGERPRINT_SCOPE = "community-report-fingerprint";
+const REPORT_DEDUPE_SCOPE = "community-report-dedupe";
+const REPORT_DEDUPE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const REPORT_DUPLICATE_MESSAGE = "You've already reported this feature.";
 
 type ReportPayload = {
   featureId?: string;
   timezone?: string;
 };
 
-type RateLimitEntry = {
-  count: number;
-  firstSeen: number;
-  lastSeen: number;
-};
-
-const reportByIp = new Map<string, RateLimitEntry>();
-const reportByFingerprint = new Map<string, RateLimitEntry>();
-let lastCleanupAt = 0;
 
 const getClientIp = (request: Request) => {
   const forwardedFor = request.headers.get("x-forwarded-for");
@@ -42,56 +45,6 @@ const hashValue = (value: string) =>
 const getFingerprint = (ip: string, userAgent: string, timezone: string) =>
   hashValue(`${ip}|${userAgent}|${timezone}`);
 
-const getRateEntry = (
-  store: Map<string, RateLimitEntry>,
-  key: string,
-  now: number,
-) => {
-  const existing = store.get(key);
-  if (!existing || now - existing.firstSeen > REPORT_WINDOW_MS) {
-    const entry = { count: 0, firstSeen: now, lastSeen: 0 };
-    store.set(key, entry);
-    return entry;
-  }
-  return existing;
-};
-
-const getRateLimitError = (entry: RateLimitEntry, now: number) => {
-  if (entry.lastSeen && now - entry.lastSeen < REPORT_COOLDOWN_MS) {
-    return "Too many reports. Please wait a moment.";
-  }
-  if (entry.count >= REPORT_MAX_PER_DAY) {
-    return "Report limit reached. Please try again tomorrow.";
-  }
-  return null;
-};
-
-const commitRateLimit = (
-  store: Map<string, RateLimitEntry>,
-  key: string,
-  entry: RateLimitEntry,
-  now: number,
-) => {
-  entry.count += 1;
-  entry.lastSeen = now;
-  store.set(key, entry);
-};
-
-const pruneStores = (now: number) => {
-  if (now - lastCleanupAt < REPORT_CLEANUP_INTERVAL_MS) return;
-  lastCleanupAt = now;
-  for (const [key, entry] of reportByIp.entries()) {
-    if (now - entry.firstSeen > REPORT_WINDOW_MS) {
-      reportByIp.delete(key);
-    }
-  }
-  for (const [key, entry] of reportByFingerprint.entries()) {
-    if (now - entry.firstSeen > REPORT_WINDOW_MS) {
-      reportByFingerprint.delete(key);
-    }
-  }
-};
-
 export async function POST(request: Request) {
   const payload = (await request.json().catch(() => null)) as
     | ReportPayload
@@ -107,20 +60,83 @@ export async function POST(request: Request) {
   }
 
   const now = Date.now();
-  pruneStores(now);
   const ip = getClientIp(request);
   const ipHash = hashValue(ip || "unknown");
   const userAgent = request.headers.get("user-agent") ?? "";
   const fingerprint = getFingerprint(ip || "unknown", userAgent, timezone);
+  const reportKey = hashValue(`${fingerprint}|${featureId}`);
 
-  const ipEntry = getRateEntry(reportByIp, ipHash, now);
-  const fingerprintEntry = getRateEntry(reportByFingerprint, fingerprint, now);
+  let ipEntry: RateLimitEntry;
+  let fingerprintEntry: RateLimitEntry;
+  let dedupeEntry: RateLimitEntry;
+  try {
+    await Promise.all([
+      pruneRateLimitEntries(
+        REPORT_IP_SCOPE,
+        REPORT_WINDOW_MS,
+        now,
+        REPORT_CLEANUP_INTERVAL_MS,
+      ),
+      pruneRateLimitEntries(
+        REPORT_FINGERPRINT_SCOPE,
+        REPORT_WINDOW_MS,
+        now,
+        REPORT_CLEANUP_INTERVAL_MS,
+      ),
+      pruneRateLimitEntries(
+        REPORT_DEDUPE_SCOPE,
+        REPORT_DEDUPE_WINDOW_MS,
+        now,
+        REPORT_CLEANUP_INTERVAL_MS,
+      ),
+    ]);
+    ipEntry = await getRateLimitEntry(
+      REPORT_IP_SCOPE,
+      ipHash,
+      now,
+      REPORT_WINDOW_MS,
+    );
+    fingerprintEntry = await getRateLimitEntry(
+      REPORT_FINGERPRINT_SCOPE,
+      fingerprint,
+      now,
+      REPORT_WINDOW_MS,
+    );
+    dedupeEntry = await getRateLimitEntry(
+      REPORT_DEDUPE_SCOPE,
+      reportKey,
+      now,
+      REPORT_DEDUPE_WINDOW_MS,
+    );
+  } catch {
+    return NextResponse.json(
+      { error: "Unable to process report right now." },
+      { status: 503 },
+    );
+  }
 
   const rateError =
-    getRateLimitError(ipEntry, now) ??
-    getRateLimitError(fingerprintEntry, now);
+    getRateLimitError(ipEntry, now, {
+      cooldownMs: REPORT_COOLDOWN_MS,
+      maxCount: REPORT_MAX_PER_DAY,
+      cooldownMessage: "Too many reports. Please wait a moment.",
+      maxMessage: "Report limit reached. Please try again tomorrow.",
+    }) ??
+    getRateLimitError(fingerprintEntry, now, {
+      cooldownMs: REPORT_COOLDOWN_MS,
+      maxCount: REPORT_MAX_PER_DAY,
+      cooldownMessage: "Too many reports. Please wait a moment.",
+      maxMessage: "Report limit reached. Please try again tomorrow.",
+    });
   if (rateError) {
     return NextResponse.json({ error: rateError }, { status: 429 });
+  }
+
+  if (dedupeEntry.count >= 1) {
+    return NextResponse.json(
+      { error: REPORT_DUPLICATE_MESSAGE },
+      { status: 409 },
+    );
   }
 
   const { data: feature, error: featureError } = await getSupabaseAdmin()
@@ -152,8 +168,21 @@ export async function POST(request: Request) {
     );
   }
 
-  commitRateLimit(reportByIp, ipHash, ipEntry, now);
-  commitRateLimit(reportByFingerprint, fingerprint, fingerprintEntry, now);
+  ipEntry.count += 1;
+  ipEntry.lastSeen = now;
+  fingerprintEntry.count += 1;
+  fingerprintEntry.lastSeen = now;
+  dedupeEntry.count += 1;
+  dedupeEntry.lastSeen = now;
+  try {
+    await Promise.all([
+      commitRateLimit(REPORT_IP_SCOPE, ipHash, ipEntry),
+      commitRateLimit(REPORT_FINGERPRINT_SCOPE, fingerprint, fingerprintEntry),
+      commitRateLimit(REPORT_DEDUPE_SCOPE, reportKey, dedupeEntry),
+    ]);
+  } catch {
+    // Ignore rate-limit persistence failures after a successful report update.
+  }
 
   return NextResponse.json({
     ok: true,

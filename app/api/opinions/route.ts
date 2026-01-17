@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
 
+import {
+  containsProfanity,
+  createProfanityFilter,
+  hasLinkSpam,
+} from "@/lib/moderation";
 import { getSupabaseAdmin } from "@/lib/supabase";
+
+const COMMENT_MAX = 500;
+const PROFANITY_ERROR = "Let's keep it constructive - please rephrase and try again.";
+const profanityFilter = createProfanityFilter();
 
 type OpinionPayload = {
   featureId?: string;
@@ -22,7 +31,7 @@ export async function POST(request: Request) {
         ? null
         : Number(ratingRaw);
 
-  if (!featureId || !score || ![1, 2, 3].includes(score)) {
+  if (!featureId || typeof featureId !== "string" || !score || ![1, 2, 3].includes(score)) {
     return NextResponse.json(
       { error: "Invalid opinion payload." },
       { status: 400 },
@@ -38,7 +47,60 @@ export async function POST(request: Request) {
     );
   }
 
-  const { error } = await getSupabaseAdmin().from("Opinions").insert({
+  if (comment && comment.length > COMMENT_MAX) {
+    return NextResponse.json(
+      { error: `Comment should be under ${COMMENT_MAX} characters.` },
+      { status: 400 },
+    );
+  }
+
+  if (comment && hasLinkSpam(comment)) {
+    return NextResponse.json(
+      { error: "Links are not allowed in comments." },
+      { status: 400 },
+    );
+  }
+
+  if (comment && containsProfanity(comment, profanityFilter)) {
+    return NextResponse.json({ error: PROFANITY_ERROR }, { status: 400 });
+  }
+
+  const supabase = getSupabaseAdmin();
+  const { data: officialFeature, error: officialError } = await supabase
+    .from("Features")
+    .select("id")
+    .eq("id", featureId)
+    .maybeSingle();
+
+  if (officialError) {
+    return NextResponse.json(
+      { error: "Failed to validate feature." },
+      { status: 500 },
+    );
+  }
+
+  if (!officialFeature) {
+    const { data: communityFeature, error: communityError } = await supabase
+      .from("CommunityFeatures")
+      .select("id")
+      .eq("id", featureId)
+      .maybeSingle();
+
+    if (communityError) {
+      return NextResponse.json(
+        { error: "Failed to validate feature." },
+        { status: 500 },
+      );
+    }
+    if (!communityFeature) {
+      return NextResponse.json(
+        { error: "Unknown feature." },
+        { status: 400 },
+      );
+    }
+  }
+
+  const { error } = await supabase.from("Opinions").insert({
     feature_id: featureId,
     score,
     comment: comment || null,

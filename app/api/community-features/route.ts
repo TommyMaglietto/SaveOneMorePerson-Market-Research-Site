@@ -1,6 +1,18 @@
 import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 
+import {
+  containsProfanity,
+  createProfanityFilter,
+  hasLinkSpam,
+} from "@/lib/moderation";
+import {
+  commitRateLimit,
+  getRateLimitEntry,
+  getRateLimitError,
+  pruneRateLimitEntries,
+  type RateLimitEntry,
+} from "@/lib/rate-limit";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 const allowedCategories = new Set([
@@ -21,17 +33,13 @@ const NAME_MAX = 80;
 const DESCRIPTION_MIN = 10;
 const DESCRIPTION_MAX = 500;
 const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
+const SUBMISSION_IP_SCOPE = "community-submission-ip";
+const SUBMISSION_FINGERPRINT_SCOPE = "community-submission-fingerprint";
+const PROFANITY_ERROR = "Let's keep it constructive - please rephrase and try again.";
 
-type RateLimitEntry = {
-  count: number;
-  firstSeen: number;
-  lastSeen: number;
-};
-
-const rateLimitByIp = new Map<string, RateLimitEntry>();
-const rateLimitByFingerprint = new Map<string, RateLimitEntry>();
 const recentContent = new Map<string, number>();
 let lastCleanupAt = 0;
+const profanityFilter = createProfanityFilter();
 
 type CommunityFeaturePayload = {
   name?: string;
@@ -63,61 +71,9 @@ const getFingerprint = (ip: string, userAgent: string, timezone: string) =>
 const normalizeContent = (value: string) =>
   value.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
 
-const hasLinkSpam = (value: string) => {
-  const urlPattern = /(https?:\/\/|www\.)/i;
-  const domainPattern =
-    /\b[a-z0-9-]+\.(com|net|org|io|co|ai|gg|app|dev|info|biz|link)\b/i;
-  return urlPattern.test(value) || domainPattern.test(value);
-};
-
-const getRateEntry = (
-  store: Map<string, RateLimitEntry>,
-  key: string,
-  now: number,
-) => {
-  const existing = store.get(key);
-  if (!existing || now - existing.firstSeen > RATE_WINDOW_MS) {
-    const entry = { count: 0, firstSeen: now, lastSeen: 0 };
-    store.set(key, entry);
-    return entry;
-  }
-  return existing;
-};
-
-const getRateLimitError = (entry: RateLimitEntry, now: number) => {
-  if (entry.lastSeen && now - entry.lastSeen < COOLDOWN_MS) {
-    return "Too many submissions. Please wait a moment and try again.";
-  }
-  if (entry.count >= MAX_SUBMISSIONS_PER_DAY) {
-    return "Daily submission limit reached. Please try again tomorrow.";
-  }
-  return null;
-};
-
-const commitRateLimit = (
-  store: Map<string, RateLimitEntry>,
-  key: string,
-  entry: RateLimitEntry,
-  now: number,
-) => {
-  entry.count += 1;
-  entry.lastSeen = now;
-  store.set(key, entry);
-};
-
-const pruneStores = (now: number) => {
+const pruneRecentContent = (now: number) => {
   if (now - lastCleanupAt < CLEANUP_INTERVAL_MS) return;
   lastCleanupAt = now;
-  for (const [key, entry] of rateLimitByIp.entries()) {
-    if (now - entry.firstSeen > RATE_WINDOW_MS) {
-      rateLimitByIp.delete(key);
-    }
-  }
-  for (const [key, entry] of rateLimitByFingerprint.entries()) {
-    if (now - entry.firstSeen > RATE_WINDOW_MS) {
-      rateLimitByFingerprint.delete(key);
-    }
-  }
   for (const [key, timestamp] of recentContent.entries()) {
     if (now - timestamp > DUPLICATE_WINDOW_MS) {
       recentContent.delete(key);
@@ -186,6 +142,13 @@ export async function POST(request: Request) {
     );
   }
 
+  if (
+    containsProfanity(name, profanityFilter) ||
+    containsProfanity(description, profanityFilter)
+  ) {
+    return NextResponse.json({ error: PROFANITY_ERROR }, { status: 400 });
+  }
+
   if (hasLinkSpam(name) || hasLinkSpam(description)) {
     return NextResponse.json(
       { error: "Links are not allowed in submissions." },
@@ -201,22 +164,61 @@ export async function POST(request: Request) {
   }
 
   const now = Date.now();
-  pruneStores(now);
+  pruneRecentContent(now);
   const ip = getClientIp(request);
   const ipHash = hashValue(ip || "unknown");
   const userAgent = request.headers.get("user-agent") ?? "";
   const fingerprint = getFingerprint(ip || "unknown", userAgent, timezone);
 
-  const ipEntry = getRateEntry(rateLimitByIp, ipHash, now);
-  const fingerprintEntry = getRateEntry(
-    rateLimitByFingerprint,
-    fingerprint,
-    now,
-  );
+  let ipEntry: RateLimitEntry;
+  let fingerprintEntry: RateLimitEntry;
+  try {
+    await Promise.all([
+      pruneRateLimitEntries(
+        SUBMISSION_IP_SCOPE,
+        RATE_WINDOW_MS,
+        now,
+        CLEANUP_INTERVAL_MS,
+      ),
+      pruneRateLimitEntries(
+        SUBMISSION_FINGERPRINT_SCOPE,
+        RATE_WINDOW_MS,
+        now,
+        CLEANUP_INTERVAL_MS,
+      ),
+    ]);
+    ipEntry = await getRateLimitEntry(
+      SUBMISSION_IP_SCOPE,
+      ipHash,
+      now,
+      RATE_WINDOW_MS,
+    );
+    fingerprintEntry = await getRateLimitEntry(
+      SUBMISSION_FINGERPRINT_SCOPE,
+      fingerprint,
+      now,
+      RATE_WINDOW_MS,
+    );
+  } catch {
+    return NextResponse.json(
+      { error: "Unable to process submission right now." },
+      { status: 503 },
+    );
+  }
 
   const rateError =
-    getRateLimitError(ipEntry, now) ??
-    getRateLimitError(fingerprintEntry, now);
+    getRateLimitError(ipEntry, now, {
+      cooldownMs: COOLDOWN_MS,
+      maxCount: MAX_SUBMISSIONS_PER_DAY,
+      cooldownMessage: "Too many submissions. Please wait a moment and try again.",
+      maxMessage: "Daily submission limit reached. Please try again tomorrow.",
+    }) ??
+    getRateLimitError(fingerprintEntry, now, {
+      cooldownMs: COOLDOWN_MS,
+      maxCount: MAX_SUBMISSIONS_PER_DAY,
+      cooldownMessage: "Too many submissions. Please wait a moment and try again.",
+      maxMessage: "Daily submission limit reached. Please try again tomorrow.",
+    });
   if (rateError) {
     return NextResponse.json({ error: rateError }, { status: 429 });
   }
@@ -250,8 +252,18 @@ export async function POST(request: Request) {
     );
   }
 
-  commitRateLimit(rateLimitByIp, ipHash, ipEntry, now);
-  commitRateLimit(rateLimitByFingerprint, fingerprint, fingerprintEntry, now);
+  ipEntry.count += 1;
+  ipEntry.lastSeen = now;
+  fingerprintEntry.count += 1;
+  fingerprintEntry.lastSeen = now;
+  try {
+    await Promise.all([
+      commitRateLimit(SUBMISSION_IP_SCOPE, ipHash, ipEntry),
+      commitRateLimit(SUBMISSION_FINGERPRINT_SCOPE, fingerprint, fingerprintEntry),
+    ]);
+  } catch {
+    // Ignore rate-limit persistence failures after a successful insert.
+  }
   recentContent.set(contentKey, now);
 
   return NextResponse.json({ ok: true }, { status: 201 });
