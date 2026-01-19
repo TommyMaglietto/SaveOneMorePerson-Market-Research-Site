@@ -25,8 +25,6 @@ type FeatureSummary = {
   yesCount: number;
   maybeCount: number;
   noCount: number;
-  ratingCount: number;
-  averageRating: number;
   commentCount: number;
 };
 
@@ -40,8 +38,6 @@ type CommunityFeatureSummary = {
   yesCount: number;
   maybeCount: number;
   noCount: number;
-  ratingCount: number;
-  averageRating: number;
   commentCount: number;
 };
 
@@ -51,24 +47,15 @@ type DistributionItem = {
   count: number;
 };
 
-type RatingDistributionItem = {
-  rating: number;
-  label: string;
-  count: number;
-};
-
 type TrendItem = {
   bucket: string;
   count: number;
-  ratingAverage: number;
-  ratingCount: number;
 };
 
 type CommentItem = {
   id: string;
   comment: string | null;
   score: number | null;
-  rating: number | null;
   created_at: string | null;
 };
 
@@ -107,9 +94,6 @@ export default function AdminDashboard() {
   >({});
   const [selectedFeatureId, setSelectedFeatureId] = useState<string | null>(null);
   const [distribution, setDistribution] = useState<DistributionItem[]>([]);
-  const [ratingDistribution, setRatingDistribution] = useState<
-    RatingDistributionItem[]
-  >([]);
   const [trend, setTrend] = useState<TrendItem[]>([]);
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [commentsPage, setCommentsPage] = useState(0);
@@ -128,10 +112,10 @@ export default function AdminDashboard() {
   >("loading");
   const [communityMessage, setCommunityMessage] = useState<string | null>(null);
   const [communitySortBy, setCommunitySortBy] = useState<
-    "popular" | "controversial" | "rated" | "feedback"
+    "popular" | "controversial" | "feedback"
   >("popular");
   const [sortBy, setSortBy] = useState<
-    "popular" | "controversial" | "rated" | "feedback"
+    "popular" | "controversial" | "feedback"
   >("popular");
 
   const selectedSummary = useMemo(
@@ -159,13 +143,6 @@ export default function AdminDashboard() {
           : b.averageScore - a.averageScore,
       );
     }
-    if (sortBy === "rated") {
-      return data.sort((a, b) =>
-        b.averageRating === a.averageRating
-          ? b.ratingCount - a.ratingCount
-          : b.averageRating - a.averageRating,
-      );
-    }
     if (sortBy === "feedback") {
       return data.sort((a, b) =>
         b.commentCount === a.commentCount
@@ -187,13 +164,6 @@ export default function AdminDashboard() {
         b.averageScore === a.averageScore
           ? b.count - a.count
           : b.averageScore - a.averageScore,
-      );
-    }
-    if (communitySortBy === "rated") {
-      return data.sort((a, b) =>
-        b.averageRating === a.averageRating
-          ? b.ratingCount - a.ratingCount
-          : b.averageRating - a.averageRating,
       );
     }
     if (communitySortBy === "feedback") {
@@ -344,14 +314,12 @@ export default function AdminDashboard() {
         if (!hasChartError) {
           const distributionData = (await distributionResponse.json()) as {
             distribution: DistributionItem[];
-            ratingDistribution: RatingDistributionItem[];
           };
           const trendData = (await trendResponse.json()) as {
             trend: TrendItem[];
           };
 
           setDistribution(distributionData.distribution ?? []);
-          setRatingDistribution(distributionData.ratingDistribution ?? []);
           setTrend(trendData.trend ?? []);
           setMessage(null);
         } else {
@@ -401,14 +369,7 @@ export default function AdminDashboard() {
   }, [commentsPage, router, selectedFeatureId]);
 
   const totalResponses = summary.reduce((sum, item) => sum + item.count, 0);
-  const totalRatings = summary.reduce((sum, item) => sum + item.ratingCount, 0);
   const totalComments = summary.reduce((sum, item) => sum + item.commentCount, 0);
-  const overallRatingAverage = totalRatings
-    ? summary.reduce(
-        (sum, item) => sum + item.averageRating * item.ratingCount,
-        0,
-      ) / totalRatings
-    : 0;
   const overallScoreAverage = totalResponses
     ? summary.reduce(
         (sum, item) => sum + item.averageScore * item.count,
@@ -543,10 +504,10 @@ export default function AdminDashboard() {
             </div>
             <div className="card-surface p-4">
               <p className="text-xs font-semibold uppercase text-[#9BA8B0]">
-                Avg rating
+                Total feedback
               </p>
               <p className="font-heading text-2xl text-[#2E5B7A]">
-                {overallRatingAverage.toFixed(2)}
+                {totalComments}
               </p>
             </div>
             <div className="card-surface p-4">
@@ -602,80 +563,42 @@ export default function AdminDashboard() {
                 </span>
               )}
             </div>
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="h-72">
-                <p className="mb-2 text-sm font-semibold text-[#6B7A84]">
-                  Swipe distribution
-                </p>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={distribution}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#D8E3E8" />
-                    <XAxis dataKey="label" />
-                    <YAxis allowDecimals={false} />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="#8FC5E8" radius={[8, 8, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="h-72">
-                <p className="mb-2 text-sm font-semibold text-[#6B7A84]">
-                  Rating distribution (1-5)
-                </p>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={ratingDistribution}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#D8E3E8" />
-                    <XAxis dataKey="label" />
-                    <YAxis allowDecimals={false} />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="#F5D5C8" radius={[8, 8, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+            <div className="h-72">
+              <p className="mb-2 text-sm font-semibold text-[#6B7A84]">
+                Swipe distribution
+              </p>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={distribution}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#D8E3E8" />
+                  <XAxis dataKey="label" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#8FC5E8" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
           <div className="card-surface flex flex-col gap-4 p-4">
-            <div className="grid gap-6 lg:grid-cols-2">
-              <div className="h-72">
-                <p className="mb-2 text-sm font-semibold text-[#6B7A84]">
-                  Response trend
-                </p>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={trend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#D8E3E8" />
-                    <XAxis dataKey="bucket" />
-                    <YAxis allowDecimals={false} />
-                    <Tooltip />
-                    <Line
-                      type="monotone"
-                      dataKey="count"
-                      stroke="#8FC5E8"
-                      strokeWidth={3}
-                      dot={{ r: 3 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="h-72">
-                <p className="mb-2 text-sm font-semibold text-[#6B7A84]">
-                  Rating trend
-                </p>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={trend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#D8E3E8" />
-                    <XAxis dataKey="bucket" />
-                    <YAxis domain={[0, 5]} />
-                    <Tooltip />
-                    <Line
-                      type="monotone"
-                      dataKey="ratingAverage"
-                      stroke="#B8A8D4"
-                      strokeWidth={3}
-                      dot={{ r: 3 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+            <div className="h-72">
+              <p className="mb-2 text-sm font-semibold text-[#6B7A84]">
+                Response trend
+              </p>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#D8E3E8" />
+                  <XAxis dataKey="bucket" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Line
+                    type="monotone"
+                    dataKey="count"
+                    stroke="#8FC5E8"
+                    strokeWidth={3}
+                    dot={{ r: 3 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
@@ -734,11 +657,6 @@ export default function AdminDashboard() {
                           >
                             {badge.label}
                           </span>
-                          {typeof comment.rating === "number" && (
-                            <span className="rounded-full bg-[#E0D4F5] px-2 py-1 text-xs font-semibold text-[#4A7B9D]">
-                              Rating {comment.rating}/5
-                            </span>
-                          )}
                         </div>
                       </div>
                       {createdLabel && (
@@ -783,7 +701,7 @@ export default function AdminDashboard() {
           <div className="card-surface p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm font-semibold text-[#6B7A84]">
-                Feature ratings
+                Feature responses
               </p>
               <div className="flex items-center gap-2 text-sm">
                 <label className="font-semibold text-[#9BA8B0]">Sort</label>
@@ -795,14 +713,12 @@ export default function AdminDashboard() {
                       event.target.value as
                         | "popular"
                         | "controversial"
-                        | "rated"
                         | "feedback",
                     )
                   }
                 >
                   <option value="popular">Most popular</option>
                   <option value="controversial">Most controversial</option>
-                  <option value="rated">Best rated</option>
                   <option value="feedback">Most feedback</option>
                 </select>
               </div>
@@ -812,7 +728,6 @@ export default function AdminDashboard() {
                 const yesPercent = getPercent(item.yesCount, item.count);
                 const maybePercent = getPercent(item.maybeCount, item.count);
                 const noPercent = getPercent(item.noCount, item.count);
-                const ratingCoverage = getPercent(item.ratingCount, item.count);
                 const commentCoverage = getPercent(item.commentCount, item.count);
                 return (
                   <div
@@ -829,8 +744,7 @@ export default function AdminDashboard() {
                         {noPercent}%
                       </p>
                       <p className="text-xs text-[#9BA8B0]">
-                        Rating {item.averageRating.toFixed(2)} · Rated{" "}
-                        {ratingCoverage}% · Comments {commentCoverage}%
+                        Feedback {commentCoverage}%
                       </p>
                     </div>
                     <div className="text-right">
@@ -851,7 +765,7 @@ export default function AdminDashboard() {
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm font-semibold text-[#6B7A84]">
-                  Community feature ratings
+                  Community feature responses
                 </p>
                 <span className="rounded-full bg-[#E8F4F8] px-3 py-1 text-xs font-semibold text-[#6B7A84]">
                   {communitySummary.length} submissions
@@ -867,14 +781,12 @@ export default function AdminDashboard() {
                       event.target.value as
                         | "popular"
                         | "controversial"
-                        | "rated"
                         | "feedback",
                     )
                   }
                 >
                   <option value="popular">Most popular</option>
                   <option value="controversial">Most controversial</option>
-                  <option value="rated">Best rated</option>
                   <option value="feedback">Most feedback</option>
                 </select>
               </div>
@@ -904,7 +816,6 @@ export default function AdminDashboard() {
                   const yesPercent = getPercent(item.yesCount, item.count);
                   const maybePercent = getPercent(item.maybeCount, item.count);
                   const noPercent = getPercent(item.noCount, item.count);
-                  const ratingCoverage = getPercent(item.ratingCount, item.count);
                   const commentCoverage = getPercent(item.commentCount, item.count);
                   const createdLabel = formatDate(item.createdAt);
                   return (
@@ -924,8 +835,7 @@ export default function AdminDashboard() {
                           {noPercent}%
                         </p>
                         <p className="text-xs text-[#9BA8B0]">
-                          Rating {item.averageRating.toFixed(2)} | Rated{" "}
-                          {ratingCoverage}% | Comments {commentCoverage}%
+                          Feedback {commentCoverage}%
                         </p>
                         {createdLabel && (
                           <p className="text-xs text-[#9BA8B0]">

@@ -23,6 +23,11 @@ const rubik = Rubik({
 export const metadata: Metadata = {
   title: "Save One More Person",
   description: "Mobile-first research cards for lightweight product feedback.",
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({

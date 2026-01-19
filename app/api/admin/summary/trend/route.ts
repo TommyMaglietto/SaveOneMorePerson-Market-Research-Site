@@ -48,7 +48,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await getSupabaseAdmin()
     .from("Opinions")
-    .select("created_at, rating")
+    .select("created_at")
     .eq("feature_id", featureId)
     .order("created_at", { ascending: true });
 
@@ -59,10 +59,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const buckets = new Map<
-    string,
-    { count: number; ratingSum: number; ratingCount: number }
-  >();
+  const buckets = new Map<string, { count: number }>();
   (data ?? []).forEach((row) => {
     if (!row.created_at) return;
     const createdAt = new Date(row.created_at);
@@ -74,12 +71,8 @@ export async function GET(request: Request) {
       bucketDate = startOfUtcMonth(createdAt);
     }
     const key = formatBucket(bucketDate);
-    const current = buckets.get(key) ?? { count: 0, ratingSum: 0, ratingCount: 0 };
+    const current = buckets.get(key) ?? { count: 0 };
     current.count += 1;
-    if (typeof row.rating === "number" && row.rating >= 1 && row.rating <= 5) {
-      current.ratingCount += 1;
-      current.ratingSum += row.rating;
-    }
     buckets.set(key, current);
   });
 
@@ -87,10 +80,6 @@ export async function GET(request: Request) {
     .map(([key, value]) => ({
       bucket: key,
       count: value.count,
-      ratingAverage: value.ratingCount
-        ? Number((value.ratingSum / value.ratingCount).toFixed(2))
-        : 0,
-      ratingCount: value.ratingCount,
     }))
     .sort((a, b) => (a.bucket > b.bucket ? 1 : -1));
 

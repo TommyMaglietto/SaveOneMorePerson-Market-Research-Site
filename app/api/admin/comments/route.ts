@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await getSupabaseAdmin()
     .from("Opinions")
-    .select("id, comment, score, rating, created_at")
+    .select("id, comment, score, created_at")
     .eq("feature_id", featureId)
     .not("comment", "is", null)
     .neq("comment", "")

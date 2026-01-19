@@ -16,7 +16,7 @@ export async function GET() {
       getSupabaseAdmin().from("Features").select("id, name, category").order("name"),
       getSupabaseAdmin()
         .from("Opinions")
-        .select("feature_id, score, rating, comment"),
+        .select("feature_id, score, comment"),
     ]);
 
   if (featureError || opinionsError) {
@@ -34,8 +34,6 @@ export async function GET() {
       yes: number;
       maybe: number;
       no: number;
-      ratingCount: number;
-      ratingSum: number;
       commentCount: number;
     }
   >();
@@ -49,8 +47,6 @@ export async function GET() {
         yes: 0,
         maybe: 0,
         no: 0,
-        ratingCount: 0,
-        ratingSum: 0,
         commentCount: 0,
       };
     current.total += 1;
@@ -58,10 +54,6 @@ export async function GET() {
     if (score === 1) current.no += 1;
     if (score === 2) current.maybe += 1;
     if (score === 3) current.yes += 1;
-    if (typeof opinion.rating === "number") {
-      current.ratingCount += 1;
-      current.ratingSum += opinion.rating;
-    }
     if (
       typeof opinion.comment === "string" &&
       opinion.comment.trim().length > 0
@@ -80,14 +72,9 @@ export async function GET() {
           yes: 0,
           maybe: 0,
           no: 0,
-          ratingCount: 0,
-          ratingSum: 0,
           commentCount: 0,
         };
       const averageScore = stats.total ? stats.sum / stats.total : 0;
-      const averageRating = stats.ratingCount
-        ? stats.ratingSum / stats.ratingCount
-        : 0;
 
       return {
         featureId: feature.id,
@@ -98,8 +85,6 @@ export async function GET() {
         yesCount: stats.yes,
         maybeCount: stats.maybe,
         noCount: stats.no,
-        ratingCount: stats.ratingCount,
-        averageRating: Number(averageRating.toFixed(2)),
         commentCount: stats.commentCount,
       };
     }) ?? [];

@@ -1239,7 +1239,7 @@ export default function SwipeDeck() {
                 <path d="M8 6.5v11l9-5.5-9-5.5z" />
               </svg>
             </span>
-            Visit our YouTube
+            Visit my channel
           </a>
         </>
       )}
