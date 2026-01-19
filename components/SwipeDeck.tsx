@@ -184,9 +184,6 @@ export default function SwipeDeck() {
   const [feedbackByFeature, setFeedbackByFeature] = useState<
     Record<string, string>
   >({});
-  const [ratingByFeature, setRatingByFeature] = useState<
-    Record<string, number>
-  >({});
   const [cardView, setCardView] = useState<CardView>("feature");
   const [isCardHidden, setIsCardHidden] = useState(false);
   const [submissionName, setSubmissionName] = useState("");
@@ -455,14 +452,7 @@ export default function SwipeDeck() {
   const submitOpinion = async (score: 1 | 2 | 3, feature: DeckItem) => {
     addSelection(score, feature);
     const commentText = (feedbackByFeature[feature.id] ?? "").trim();
-    const ratingValue = ratingByFeature[feature.id] ?? null;
     setFeedbackByFeature((prev) => {
-      if (prev[feature.id] === undefined) return prev;
-      const updated = { ...prev };
-      delete updated[feature.id];
-      return updated;
-    });
-    setRatingByFeature((prev) => {
       if (prev[feature.id] === undefined) return prev;
       const updated = { ...prev };
       delete updated[feature.id];
@@ -478,7 +468,6 @@ export default function SwipeDeck() {
           featureId: feature.id,
           score,
           comment: commentText.length ? commentText : null,
-          rating: ratingValue,
         }),
       });
       if (!response.ok) {
@@ -627,24 +616,12 @@ export default function SwipeDeck() {
 
   const currentFeedback =
     currentFeature?.id ? feedbackByFeature[currentFeature.id] ?? "" : "";
-  const currentRating =
-    currentFeature?.id !== undefined
-      ? ratingByFeature[currentFeature.id] ?? null
-      : null;
 
   const handleFeedbackChange = (value: string) => {
     if (!currentFeature) return;
     setFeedbackByFeature((prev) => ({
       ...prev,
       [currentFeature.id]: value,
-    }));
-  };
-
-  const handleRatingSelect = (rating: number) => {
-    if (!currentFeature) return;
-    setRatingByFeature((prev) => ({
-      ...prev,
-      [currentFeature.id]: rating,
     }));
   };
 
@@ -1065,37 +1042,37 @@ export default function SwipeDeck() {
                       </span>
                     </div>
                     <div className="grid w-full grid-cols-3 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => dismissCard(1, "left")}
-                      disabled={!currentFeature || isLocked}
-                      aria-label="No"
-                      className="flex h-14 items-center justify-center rounded-2xl border border-[#F5D5C8] bg-[#F5D5C8] text-sm font-semibold text-[#2E5B7A] shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                      style={getButtonStyle("no")}
-                    >
-                      <X size={20} strokeWidth={2.5} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => dismissCard(2, "up")}
-                      disabled={!currentFeature || isLocked}
-                      aria-label="Maybe"
-                      className="flex h-14 items-center justify-center rounded-2xl border border-[#D8E3E8] bg-[#D4DBE0] text-sm font-semibold text-[#4A7B9D] shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                      style={getButtonStyle("maybe")}
-                    >
-                      Maybe
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => dismissCard(3, "right")}
-                      disabled={!currentFeature || isLocked}
-                      aria-label="Yes"
-                      className="flex h-14 items-center justify-center rounded-2xl border border-[#D8E3E8] bg-[#E8F5E8] text-lg font-semibold text-[#3D6B43] shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                      style={getButtonStyle("yes")}
-                    >
-                      <Check size={20} strokeWidth={2.5} />
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => dismissCard(1, "left")}
+                        disabled={!currentFeature || isLocked}
+                        aria-label="No"
+                        className="flex h-14 items-center justify-center rounded-2xl border border-[#F5D5C8] bg-[#F5D5C8] text-sm font-semibold text-[#2E5B7A] shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                        style={getButtonStyle("no")}
+                      >
+                        <X size={20} strokeWidth={2.5} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => dismissCard(2, "up")}
+                        disabled={!currentFeature || isLocked}
+                        aria-label="Maybe"
+                        className="flex h-14 items-center justify-center rounded-2xl border border-[#D8E3E8] bg-[#D4DBE0] text-sm font-semibold text-[#4A7B9D] shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                        style={getButtonStyle("maybe")}
+                      >
+                        Maybe
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => dismissCard(3, "right")}
+                        disabled={!currentFeature || isLocked}
+                        aria-label="Yes"
+                        className="flex h-14 items-center justify-center rounded-2xl border border-[#D8E3E8] bg-[#E8F5E8] text-lg font-semibold text-[#3D6B43] shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                        style={getButtonStyle("yes")}
+                      >
+                        <Check size={20} strokeWidth={2.5} />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1107,7 +1084,7 @@ export default function SwipeDeck() {
                     pointerEvents: isFlipped ? "auto" : "none",
                   }}
                 >
-                  <div className="space-y-4">
+                  <div className="flex flex-1 flex-col gap-4">
                     <p className="text-center text-sm font-semibold text-[#4A7B9D]">
                       What would you change about this feature?
                     </p>
@@ -1115,35 +1092,10 @@ export default function SwipeDeck() {
                       value={currentFeedback}
                       onChange={(event) => handleFeedbackChange(event.target.value)}
                       placeholder="Your thoughts..."
-                      className="h-40 w-full resize-none rounded-2xl border border-[#D8E3E8] bg-white px-4 py-3 text-sm text-[#4A7B9D] shadow-sm"
+                      className="min-h-[220px] w-full flex-1 resize-none rounded-2xl border border-[#D8E3E8] bg-white px-4 py-3 text-sm text-[#4A7B9D] shadow-sm"
                     />
                   </div>
-                  <div className="flex flex-1 flex-col items-center justify-center gap-4">
-                    <p className="text-center text-base font-semibold text-[#4A7B9D]">
-                      Rate this feature (1-5)
-                    </p>
-                    <div className="flex items-center justify-center gap-4">
-                      {[1, 2, 3, 4, 5].map((value) => {
-                        const isSelected = currentRating === value;
-                        return (
-                          <button
-                            key={value}
-                            type="button"
-                            onClick={() => handleRatingSelect(value)}
-                            aria-pressed={isSelected}
-                            className={`h-14 w-14 rounded-full border text-lg font-semibold transition ${
-                              isSelected
-                                ? "border-[#8FC5E8] bg-[#8FC5E8] text-white"
-                                : "border-[#D8E3E8] bg-white text-[#6B7A84]"
-                            }`}
-                          >
-                            {value}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2">
+                  <div className="mt-3 flex flex-col gap-2">
                     <p className="text-center text-xs text-[#9BA8B0]">
                       Your feedback is saved with your yes/no/maybe response.
                     </p>
