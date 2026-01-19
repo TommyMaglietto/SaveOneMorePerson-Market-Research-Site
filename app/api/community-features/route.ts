@@ -199,7 +199,8 @@ export async function POST(request: Request) {
       now,
       RATE_WINDOW_MS,
     );
-  } catch {
+  } catch (error) {
+    console.error("[community-features] rate limit error", error);
     return NextResponse.json(
       { error: "Unable to process submission right now." },
       { status: 503 },
