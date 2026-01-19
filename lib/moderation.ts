@@ -1,6 +1,20 @@
 import Filter from "bad-words";
 
-const profanitySafeWords = new Set(["scunthorpe", "penistone"]);
+const profanitySafeWords = new Set([
+  "scunthorpe",
+  "penistone",
+  "god",
+  "jesus",
+  "christ",
+  "lord",
+  "yahweh",
+  "jehovah",
+  "messiah",
+  "emmanuel",
+  "immanuel",
+  "elohim",
+  "adonai",
+]);
 
 const phoneticBadWords = new Set([
   "biatch",
