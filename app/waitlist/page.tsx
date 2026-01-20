@@ -6,22 +6,23 @@ import { type FormEvent, useEffect, useState } from "react";
 
 const TURNSTILE_SITE_KEY = "0x4AAAAAACNirQzl3-5r4WFA";
 
-const COMMON_DOMAIN_TYPOS = new Set([
-  "gmial.com",
-  "gmai.com",
-  "gmaill.com",
-  "gmaol.com",
-  "gmal.com",
-  "hotmial.com",
-  "hotmal.com",
-  "hotmai.com",
-  "yahooo.com",
-  "yahho.com",
-  "yaho.com",
-  "outlok.com",
-  "icloud.con",
-  "aol.con",
-]);
+const DOMAIN_SUGGESTIONS: Record<string, string> = {
+  "gmail.co": "gmail.com",
+  "gmial.com": "gmail.com",
+  "gmai.com": "gmail.com",
+  "gmaill.com": "gmail.com",
+  "gmaol.com": "gmail.com",
+  "gmal.com": "gmail.com",
+  "hotmial.com": "hotmail.com",
+  "hotmal.com": "hotmail.com",
+  "hotmai.com": "hotmail.com",
+  "yahooo.com": "yahoo.com",
+  "yahho.com": "yahoo.com",
+  "yaho.com": "yahoo.com",
+  "outlok.com": "outlook.com",
+  "icloud.con": "icloud.com",
+  "aol.con": "aol.com",
+};
 
 const getEmailValidationError = (email: string) => {
   if (!email) return "Please enter an email address.";
@@ -48,8 +49,9 @@ const getEmailValidationError = (email: string) => {
     return "Email addresses must end with a valid domain extension.";
   }
 
-  if (COMMON_DOMAIN_TYPOS.has(domain)) {
-    return "Please double-check the email domain.";
+  const suggestion = DOMAIN_SUGGESTIONS[domain];
+  if (suggestion) {
+    return `Please double-check the email domain. Did you mean ${suggestion}?`;
   }
 
   return null;

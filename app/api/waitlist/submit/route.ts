@@ -1,9 +1,28 @@
+import { resolveMx } from "dns/promises";
 import { NextResponse } from "next/server";
 
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 const TURNSTILE_VERIFY_URL =
   "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+const MX_LOOKUP_TIMEOUT_MS = 2500;
+const DOMAIN_SUGGESTIONS: Record<string, string> = {
+  "gmail.co": "gmail.com",
+  "gmial.com": "gmail.com",
+  "gmai.com": "gmail.com",
+  "gmaill.com": "gmail.com",
+  "gmaol.com": "gmail.com",
+  "gmal.com": "gmail.com",
+  "hotmial.com": "hotmail.com",
+  "hotmal.com": "hotmail.com",
+  "hotmai.com": "hotmail.com",
+  "yahooo.com": "yahoo.com",
+  "yahho.com": "yahoo.com",
+  "yaho.com": "yahoo.com",
+  "outlok.com": "outlook.com",
+  "icloud.con": "icloud.com",
+  "aol.con": "aol.com",
+};
 
 const getClientIp = (request: Request) => {
   const cfConnectingIp = request.headers.get("cf-connecting-ip");
@@ -19,23 +38,6 @@ const getClientIp = (request: Request) => {
 };
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
-
-const COMMON_DOMAIN_TYPOS = new Set([
-  "gmial.com",
-  "gmai.com",
-  "gmaill.com",
-  "gmaol.com",
-  "gmal.com",
-  "hotmial.com",
-  "hotmal.com",
-  "hotmai.com",
-  "yahooo.com",
-  "yahho.com",
-  "yaho.com",
-  "outlok.com",
-  "icloud.con",
-  "aol.con",
-]);
 
 const getEmailValidationError = (email: string) => {
   if (!email) return "Please enter an email address.";
@@ -62,11 +64,26 @@ const getEmailValidationError = (email: string) => {
     return "Email addresses must end with a valid domain extension.";
   }
 
-  if (COMMON_DOMAIN_TYPOS.has(domain)) {
-    return "Please double-check the email domain.";
+  const suggestion = DOMAIN_SUGGESTIONS[domain];
+  if (suggestion) {
+    return `Please double-check the email domain. Did you mean ${suggestion}?`;
   }
 
   return null;
+};
+
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number) =>
+  new Promise<T>((resolve, reject) => {
+    const timeoutId = setTimeout(() => reject(new Error("timeout")), timeoutMs);
+    promise
+      .then((result) => resolve(result))
+      .catch((error) => reject(error))
+      .finally(() => clearTimeout(timeoutId));
+  });
+
+const hasMxRecord = async (domain: string) => {
+  const records = await withTimeout(resolveMx(domain), MX_LOOKUP_TIMEOUT_MS);
+  return Array.isArray(records) && records.length > 0;
 };
 
 
@@ -141,6 +158,23 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Verification failed. Please try again." },
       { status: 400 },
+    );
+  }
+
+  const domain = email.split("@")[1] ?? "";
+  try {
+    const mxValid = await hasMxRecord(domain);
+    if (!mxValid) {
+      return NextResponse.json(
+        { error: "Please use an email domain that can receive mail." },
+        { status: 400 },
+      );
+    }
+  } catch (error) {
+    console.error("[waitlist-submit] MX lookup failed", error);
+    return NextResponse.json(
+      { error: "Unable to verify the email domain. Please try again." },
+      { status: 502 },
     );
   }
 
