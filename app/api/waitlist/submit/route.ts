@@ -92,7 +92,7 @@ export async function POST(request: Request) {
   }
 
   const supabase = getSupabaseAdmin();
-  const { error } = await supabase.from("Emails").insert({ emails: email });
+  const { error } = await supabase.from("Emails").insert({ email });
   if (error) {
     console.error("[waitlist-submit] Supabase insert failed", error);
     return NextResponse.json(
