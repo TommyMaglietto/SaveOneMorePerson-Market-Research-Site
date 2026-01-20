@@ -868,7 +868,7 @@ export default function SwipeDeck() {
         </Link>
       </div>
 
-      <div className="relative h-[420px] w-full">
+      <div className="relative h-[480px] w-full">
         {status === "loading" && (
           <div className="card-surface flex h-full items-center justify-center text-[#9BA8B0]">
             Loading cards...
@@ -1073,6 +1073,14 @@ export default function SwipeDeck() {
                         <Check size={20} strokeWidth={2.5} />
                       </button>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsFlipped(true)}
+                      disabled={!currentFeature || isCardHidden}
+                      className="w-full rounded-2xl bg-[#8FC5E8] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Got thoughts? Help us improve this feature.
+                    </button>
                   </div>
                 </div>
 
@@ -1095,10 +1103,17 @@ export default function SwipeDeck() {
                       className="min-h-[220px] w-full flex-1 resize-none rounded-2xl border border-[#D8E3E8] bg-white px-4 py-3 text-sm text-[#4A7B9D] shadow-sm"
                     />
                   </div>
-                  <div className="mt-3 flex flex-col gap-2">
+                  <div className="mt-3 flex flex-col gap-3">
                     <p className="text-center text-xs text-[#9BA8B0]">
                       Your feedback is saved with your yes/no/maybe response.
                     </p>
+                    <button
+                      type="button"
+                      onClick={() => setIsFlipped(false)}
+                      className="w-full rounded-2xl bg-[#8FC5E8] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5"
+                    >
+                      Back to the feature
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1213,43 +1228,31 @@ export default function SwipeDeck() {
           {isSubmitting ? "Submitting..." : "Share Your Feature"}
         </button>
       ) : (
-        <>
-          <button
-            type="button"
-            onClick={() => setIsFlipped((prev) => !prev)}
-            disabled={!currentFeature || cardView !== "feature" || isCardHidden}
-            className="w-full rounded-2xl bg-[#8FC5E8] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+        <div className="grid w-full grid-cols-2 gap-3">
+          <Link
+            href="/waitlist"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[#D8E3E8] bg-white/80 px-4 py-3 text-sm font-semibold text-[#4A7B9D] shadow-sm transition hover:-translate-y-0.5 hover:border-[#B8C4CC]"
           >
-            {isFlipped
-              ? "Back to the feature"
-              : "Got thoughts? Help us improve this feature."}
-          </button>
-          <div className="mt-3 flex w-full flex-col gap-3">
-            <Link
-              href="/waitlist"
-              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[#D8E3E8] bg-white/80 px-4 py-3 text-sm font-semibold text-[#4A7B9D] shadow-sm transition hover:-translate-y-0.5 hover:border-[#B8C4CC]"
-            >
-              Join the waitlist
-            </Link>
-            <a
-              href="https://www.youtube.com/@SaveOneMorePerson"
-              target="_blank"
-              rel="noreferrer noopener"
-              className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[#F5A3A3] bg-white/80 px-4 py-3 text-sm font-semibold text-[#D86161] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#FDEBEC]"
-            >
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#D86161] text-white">
-                <svg
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                  className="ml-0.5 h-3.5 w-3.5 fill-current"
-                >
-                  <path d="M8 6.5v11l9-5.5-9-5.5z" />
-                </svg>
-              </span>
-              Visit my channel
-            </a>
-          </div>
-        </>
+            Join the waitlist
+          </Link>
+          <a
+            href="https://www.youtube.com/@SaveOneMorePerson"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-[#F5A3A3] bg-white/80 px-4 py-3 text-sm font-semibold text-[#D86161] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#FDEBEC]"
+          >
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#D86161] text-white">
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                className="ml-0.5 h-3.5 w-3.5 fill-current"
+              >
+                <path d="M8 6.5v11l9-5.5-9-5.5z" />
+              </svg>
+            </span>
+            Visit my channel
+          </a>
+        </div>
       )}
 
       {message && (
