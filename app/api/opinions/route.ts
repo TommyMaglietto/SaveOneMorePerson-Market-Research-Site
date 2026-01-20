@@ -5,6 +5,7 @@ import {
   createProfanityFilter,
   hasLinkSpam,
 } from "@/lib/moderation";
+import { RESPONSE_EVENT, responseEvents } from "@/lib/response-events";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
 const COMMENT_MAX = 500;
@@ -15,7 +16,6 @@ type OpinionPayload = {
   featureId?: string;
   score?: number;
   comment?: string | null;
-  rating?: number | null;
 };
 
 export async function POST(request: Request) {
@@ -23,13 +23,6 @@ export async function POST(request: Request) {
   const featureId = payload?.featureId;
   const score = payload?.score;
   const comment = payload?.comment?.trim() ?? null;
-  const ratingRaw = payload?.rating;
-  const rating =
-    typeof ratingRaw === "number"
-      ? ratingRaw
-      : ratingRaw === null || ratingRaw === undefined
-        ? null
-        : Number(ratingRaw);
 
   if (!featureId || typeof featureId !== "string" || !score || ![1, 2, 3].includes(score)) {
     return NextResponse.json(
@@ -37,16 +30,6 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  if (
-    rating !== null &&
-    (!Number.isInteger(rating) || rating < 1 || rating > 5)
-  ) {
-    return NextResponse.json(
-      { error: "Invalid rating payload." },
-      { status: 400 },
-    );
-  }
-
   if (comment && comment.length > COMMENT_MAX) {
     return NextResponse.json(
       { error: `Comment should be under ${COMMENT_MAX} characters.` },
@@ -104,7 +87,6 @@ export async function POST(request: Request) {
     feature_id: featureId,
     score,
     comment: comment || null,
-    rating,
   });
 
   if (error) {
@@ -112,6 +94,16 @@ export async function POST(request: Request) {
       { error: "Failed to save opinion." },
       { status: 500 },
     );
+  }
+
+  const { count, error: countError } = await supabase
+    .from("Opinions")
+    .select("id", { count: "exact", head: true });
+
+  if (countError) {
+    responseEvents.emit(RESPONSE_EVENT, { delta: 1 });
+  } else {
+    responseEvents.emit(RESPONSE_EVENT, { total: count ?? 0 });
   }
 
   return NextResponse.json({ ok: true }, { status: 201 });

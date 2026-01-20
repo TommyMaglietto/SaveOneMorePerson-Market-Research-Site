@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, X } from "lucide-react";
 import {
   Bar,
@@ -69,6 +69,7 @@ type ModerationItem = {
 };
 
 const COMMENTS_PAGE_SIZE = 5;
+const ADMIN_REFRESH_INTERVAL_MS = 30 * 60 * 1000;
 
 const bucketOptions = [
   { value: "day", label: "Daily" },
@@ -180,11 +181,14 @@ export default function AdminDashboard() {
     });
   }, [communitySortBy, communitySummary]);
 
-  useEffect(() => {
-    const loadSummary = async () => {
+  const loadSummary = useCallback(
+    async (options?: { silent?: boolean; resetPage?: boolean }) => {
+      const silent = options?.silent ?? false;
+      const resetPage = options?.resetPage ?? false;
       try {
-        setStatus("loading");
-        setMessage(null);
+        if (!silent) {
+          setStatus("loading");
+        }
         const response = await fetch("/api/admin/summary/feature-ratings", {
           credentials: "include",
         });
@@ -196,24 +200,35 @@ export default function AdminDashboard() {
           throw new Error("Unable to load summary.");
         }
         const data = (await response.json()) as { summary: FeatureSummary[] };
-        setSummary(data.summary ?? []);
-        setSelectedFeatureId(data.summary?.[0]?.featureId ?? null);
-        setCommentsPage(0);
+        const nextSummary = data.summary ?? [];
+        setSummary(nextSummary);
+        setSelectedFeatureId((prev) => {
+          if (!nextSummary.length) return null;
+          if (prev && nextSummary.some((item) => item.featureId === prev)) {
+            return prev;
+          }
+          return nextSummary[0]?.featureId ?? null;
+        });
+        if (resetPage) {
+          setCommentsPage(0);
+        }
         setStatus("ready");
+        setMessage(null);
       } catch {
         setStatus("error");
         setMessage("Unable to load admin summary.");
       }
-    };
+    },
+    [router],
+  );
 
-    loadSummary();
-  }, [router]);
-
-  useEffect(() => {
-    const loadCommunitySummary = async () => {
+  const loadCommunitySummary = useCallback(
+    async (options?: { silent?: boolean }) => {
+      const silent = options?.silent ?? false;
       try {
-        setCommunityStatus("loading");
-        setCommunityMessage(null);
+        if (!silent) {
+          setCommunityStatus("loading");
+        }
         const response = await fetch(
           "/api/admin/summary/community-feature-ratings",
           { credentials: "include" },
@@ -230,64 +245,63 @@ export default function AdminDashboard() {
         };
         setCommunitySummary(data.summary ?? []);
         setCommunityStatus("ready");
+        setCommunityMessage(null);
       } catch {
         setCommunitySummary([]);
         setCommunityStatus("error");
         setCommunityMessage("Unable to load community features.");
       }
-    };
+    },
+    [router],
+  );
 
-    loadCommunitySummary();
-  }, [router]);
-
-  useEffect(() => {
-    const loadModeration = async () => {
-      try {
+  const loadModeration = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
+    try {
+      if (!silent) {
         setModerationStatus("loading");
         setModerationMessage(null);
-        const response = await fetch("/api/admin/moderation", {
-          credentials: "include",
-        });
-        if (response.status === 401) {
-          router.push("/admin/login");
-          return;
-        }
-        if (!response.ok) {
-          throw new Error("Unable to load moderation queue.");
-        }
-        const data = (await response.json()) as {
-          features: {
-            id: string;
-            name: string;
-            description: string | null;
-            category: string | null;
-            created_at: string | null;
-            reported_count: number | null;
-          }[];
-        };
-        const normalized =
-          data.features?.map((feature) => ({
-            id: feature.id,
-            name: feature.name,
-            description: feature.description,
-            category: feature.category,
-            createdAt: feature.created_at,
-            reportedCount: feature.reported_count ?? 0,
-          })) ?? [];
-        setFlaggedFeatures(normalized);
-        setModerationStatus("ready");
-      } catch {
-        setFlaggedFeatures([]);
-        setModerationStatus("error");
-        setModerationMessage("Unable to load flagged submissions.");
       }
-    };
-
-    loadModeration();
+      const response = await fetch("/api/admin/moderation", {
+        credentials: "include",
+      });
+      if (response.status === 401) {
+        router.push("/admin/login");
+        return;
+      }
+      if (!response.ok) {
+        throw new Error("Unable to load moderation queue.");
+      }
+      const data = (await response.json()) as {
+        features: {
+          id: string;
+          name: string;
+          description: string | null;
+          category: string | null;
+          created_at: string | null;
+          reported_count: number | null;
+        }[];
+      };
+      const normalized =
+        data.features?.map((feature) => ({
+          id: feature.id,
+          name: feature.name,
+          description: feature.description,
+          category: feature.category,
+          createdAt: feature.created_at,
+          reportedCount: feature.reported_count ?? 0,
+        })) ?? [];
+      setFlaggedFeatures(normalized);
+      setModerationStatus("ready");
+    } catch {
+      setFlaggedFeatures([]);
+      setModerationStatus("error");
+      setModerationMessage("Unable to load flagged submissions.");
+    }
   }, [router]);
 
-  useEffect(() => {
-    const loadDetails = async () => {
+  const loadDetails = useCallback(
+    async (_options?: { silent?: boolean }) => {
       if (!selectedFeatureId) return;
       try {
         const [distributionResponse, trendResponse] = await Promise.all([
@@ -328,17 +342,18 @@ export default function AdminDashboard() {
       } catch {
         setMessage("Unable to load chart data.");
       }
-    };
+    },
+    [bucket, router, selectedFeatureId],
+  );
 
-    loadDetails();
-  }, [bucket, router, selectedFeatureId]);
-
-  useEffect(() => {
-    const loadComments = async () => {
+  const loadComments = useCallback(
+    async (options?: { silent?: boolean }) => {
       if (!selectedFeatureId) return;
+      const silent = options?.silent ?? false;
       try {
-        setCommentsStatus("loading");
-        setCommentsMessage(null);
+        if (!silent) {
+          setCommentsStatus("loading");
+        }
         const response = await fetch(
           `/api/admin/comments?featureId=${selectedFeatureId}&page=${commentsPage}&limit=${COMMENTS_PAGE_SIZE}`,
           { credentials: "include" },
@@ -357,16 +372,50 @@ export default function AdminDashboard() {
         setComments(data.comments ?? []);
         setCommentsHasMore(Boolean(data.hasMore));
         setCommentsStatus("ready");
+        setCommentsMessage(null);
       } catch {
         setComments([]);
         setCommentsHasMore(false);
         setCommentsStatus("error");
         setCommentsMessage("Unable to load comments.");
       }
-    };
+    },
+    [commentsPage, router, selectedFeatureId],
+  );
 
+  useEffect(() => {
+    loadSummary({ resetPage: true });
+  }, [loadSummary]);
+
+  useEffect(() => {
+    loadCommunitySummary();
+  }, [loadCommunitySummary]);
+
+  useEffect(() => {
+    loadModeration();
+  }, [loadModeration]);
+
+  useEffect(() => {
+    loadDetails();
+  }, [loadDetails]);
+
+  useEffect(() => {
     loadComments();
-  }, [commentsPage, router, selectedFeatureId]);
+  }, [loadComments]);
+
+  useEffect(() => {
+    const refresh = () => {
+      loadSummary({ silent: true });
+      loadCommunitySummary({ silent: true });
+      loadDetails({ silent: true });
+      loadComments({ silent: true });
+      loadModeration({ silent: true });
+    };
+    const intervalId = window.setInterval(refresh, ADMIN_REFRESH_INTERVAL_MS);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [loadSummary, loadCommunitySummary, loadDetails, loadComments, loadModeration]);
 
   const totalResponses = summary.reduce((sum, item) => sum + item.count, 0);
   const totalComments = summary.reduce((sum, item) => sum + item.commentCount, 0);
