@@ -6,6 +6,55 @@ import { type FormEvent, useEffect, useState } from "react";
 
 const TURNSTILE_SITE_KEY = "0x4AAAAAACNirQzl3-5r4WFA";
 
+const COMMON_DOMAIN_TYPOS = new Set([
+  "gmial.com",
+  "gmai.com",
+  "gmaill.com",
+  "gmaol.com",
+  "gmal.com",
+  "hotmial.com",
+  "hotmal.com",
+  "hotmai.com",
+  "yahooo.com",
+  "yahho.com",
+  "yaho.com",
+  "outlok.com",
+  "icloud.con",
+  "aol.con",
+]);
+
+const getEmailValidationError = (email: string) => {
+  if (!email) return "Please enter an email address.";
+  if (/\s/.test(email)) return "Email addresses cannot contain spaces.";
+
+  const parts = email.split("@");
+  if (parts.length !== 2) return "Email addresses must include one @ symbol.";
+
+  const [local, domain] = parts;
+  if (!local) return "Email addresses need text before the @ symbol.";
+  if (!domain) return "Email addresses need a domain after the @ symbol.";
+
+  if (email.includes("..")) return "Email addresses cannot contain double dots.";
+  if (local.endsWith(".") || domain.startsWith(".")) {
+    return "Email addresses cannot have dots next to the @ symbol.";
+  }
+
+  if (!domain.includes(".")) {
+    return "Email addresses need a domain with a dot (example.com).";
+  }
+
+  const tld = domain.split(".").pop() ?? "";
+  if (!/^[a-z]{2,}$/i.test(tld)) {
+    return "Email addresses must end with a valid domain extension.";
+  }
+
+  if (COMMON_DOMAIN_TYPOS.has(domain)) {
+    return "Please double-check the email domain.";
+  }
+
+  return null;
+};
+
 export default function WaitlistPage() {
   const [isVerified, setIsVerified] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
@@ -13,6 +62,7 @@ export default function WaitlistPage() {
     "idle",
   );
   const [submitMessage, setSubmitMessage] = useState("");
+  const [showMissionMessage, setShowMissionMessage] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
     const w = window as typeof window & {
@@ -44,6 +94,7 @@ export default function WaitlistPage() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (submitStatus === "submitting") return;
+    setShowMissionMessage(false);
     if (!isVerified) {
       setSubmitStatus("error");
       setSubmitMessage("Please complete the verification before submitting.");
@@ -53,11 +104,11 @@ export default function WaitlistPage() {
     const form = event.currentTarget;
     const formData = new FormData(form);
     const emailValue = formData.get("email");
-    const email = typeof emailValue === "string" ? emailValue.trim() : "";
-    const emailPattern = /^\S+@\S+\.\S+$/;
-    if (!email || !emailPattern.test(email)) {
+    const email = typeof emailValue === "string" ? emailValue.trim().toLowerCase() : "";
+    const validationError = getEmailValidationError(email);
+    if (validationError) {
       setSubmitStatus("error");
-      setSubmitMessage("Please enter a valid email address.");
+      setSubmitMessage(validationError);
       return;
     }
     formData.set("email", email);
@@ -98,6 +149,7 @@ export default function WaitlistPage() {
           ? "You're already on the waitlist. We will keep you posted on launch."
           : "Thanks for joining the waitlist. We will email you when the app launches.",
       );
+      setShowMissionMessage(!alreadySubscribed);
       form.reset();
       setIsVerified(false);
       setStatusMessage("");
@@ -108,6 +160,7 @@ export default function WaitlistPage() {
           : "Unable to submit right now. Please try again.";
       setSubmitStatus("error");
       setSubmitMessage(message);
+      setShowMissionMessage(false);
     }
   };
 
@@ -219,6 +272,47 @@ export default function WaitlistPage() {
             </p>
           )}
         </form>
+
+        {showMissionMessage && (
+          <section className="card-surface space-y-3 p-6 text-sm text-[#6B7A84]">
+            <h2 className="text-base font-semibold text-[#2E5B7A]">
+              Thank You for Joining Our Mission
+            </h2>
+            <p className="font-semibold text-[#2E5B7A]">Dear Friend,</p>
+            <p>
+              Thank you for joining our community and committing to help us save one more
+              person.
+            </p>
+            <p>
+              Your decision to be part of this journey means more than you know. Every
+              soul matters, and together, we are building something that will reach
+              hearts and change lives. You're not just a subscriber - you're a partner
+              in this mission.
+            </p>
+            <p>
+              The app we're creating is being shaped by voices like yours. Your
+              suggestions, your insights, and your experiences will help us build
+              features that truly serve those who need hope, connection, and the
+              transforming power of faith. We're building this together, and your input
+              is invaluable.
+            </p>
+            <p>
+              As we move forward, we'll keep you updated on our progress, share stories
+              of impact, and invite you to contribute ideas that will help us reach one
+              more person, and then another, and another.
+            </p>
+            <p>
+              Thank you for saying yes. Thank you for caring. Thank you for being part
+              of something bigger than ourselves. We're so grateful to have you with
+              us.
+            </p>
+            <p>In faith and gratitude,</p>
+            <p className="font-semibold text-[#2E5B7A]">Save One More Person</p>
+            <p className="text-xs italic text-[#9BA8B0]">
+              "For the Son of Man came to seek and to save the lost." - Luke 19:10
+            </p>
+          </section>
+        )}
       </main>
     </div>
   );

@@ -20,7 +20,55 @@ const getClientIp = (request: Request) => {
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
-const isValidEmail = (email: string) => /^\S+@\S+\.\S+$/.test(email);
+const COMMON_DOMAIN_TYPOS = new Set([
+  "gmial.com",
+  "gmai.com",
+  "gmaill.com",
+  "gmaol.com",
+  "gmal.com",
+  "hotmial.com",
+  "hotmal.com",
+  "hotmai.com",
+  "yahooo.com",
+  "yahho.com",
+  "yaho.com",
+  "outlok.com",
+  "icloud.con",
+  "aol.con",
+]);
+
+const getEmailValidationError = (email: string) => {
+  if (!email) return "Please enter an email address.";
+  if (/\s/.test(email)) return "Email addresses cannot contain spaces.";
+
+  const parts = email.split("@");
+  if (parts.length !== 2) return "Email addresses must include one @ symbol.";
+
+  const [local, domain] = parts;
+  if (!local) return "Email addresses need text before the @ symbol.";
+  if (!domain) return "Email addresses need a domain after the @ symbol.";
+
+  if (email.includes("..")) return "Email addresses cannot contain double dots.";
+  if (local.endsWith(".") || domain.startsWith(".")) {
+    return "Email addresses cannot have dots next to the @ symbol.";
+  }
+
+  if (!domain.includes(".")) {
+    return "Email addresses need a domain with a dot (example.com).";
+  }
+
+  const tld = domain.split(".").pop() ?? "";
+  if (!/^[a-z]{2,}$/i.test(tld)) {
+    return "Email addresses must end with a valid domain extension.";
+  }
+
+  if (COMMON_DOMAIN_TYPOS.has(domain)) {
+    return "Please double-check the email domain.";
+  }
+
+  return null;
+};
+
 
 export async function POST(request: Request) {
   const formData = await request.formData();
@@ -38,8 +86,13 @@ export async function POST(request: Request) {
   }
 
   const email = normalizeEmail(emailValue);
-  if (!email || email.length > 320 || !isValidEmail(email)) {
+  if (!email || email.length > 320) {
     return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
+  }
+
+  const validationError = getEmailValidationError(email);
+  if (validationError) {
+    return NextResponse.json({ error: validationError }, { status: 400 });
   }
 
   if (typeof turnstileToken !== "string" || !turnstileToken) {
