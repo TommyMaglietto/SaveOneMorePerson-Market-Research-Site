@@ -52,6 +52,15 @@ export default function WaitlistPage() {
 
     const form = event.currentTarget;
     const formData = new FormData(form);
+    const emailValue = formData.get("email");
+    const email = typeof emailValue === "string" ? emailValue.trim() : "";
+    const emailPattern = /^\S+@\S+\.\S+$/;
+    if (!email || !emailPattern.test(email)) {
+      setSubmitStatus("error");
+      setSubmitMessage("Please enter a valid email address.");
+      return;
+    }
+    formData.set("email", email);
     const body = new URLSearchParams();
     formData.forEach((value, key) => {
       if (typeof value === "string") {
@@ -71,7 +80,7 @@ export default function WaitlistPage() {
         },
       });
       const responseText = await response.text();
-      let payload: { error?: string } | null = null;
+      let payload: { error?: string; alreadySubscribed?: boolean } | null = null;
       try {
         payload = responseText ? (JSON.parse(responseText) as { error?: string }) : null;
       } catch {
@@ -82,13 +91,16 @@ export default function WaitlistPage() {
           responseText?.trim() || `Submission failed (status ${response.status}).`;
         throw new Error(payload?.error ?? fallbackMessage);
       }
+      const alreadySubscribed = Boolean(payload?.alreadySubscribed);
       setSubmitStatus("success");
       setSubmitMessage(
-        "Thanks for joining the waitlist. We will email you when the app launches.",
+        alreadySubscribed
+          ? "You're already on the waitlist. We will keep you posted on launch."
+          : "Thanks for joining the waitlist. We will email you when the app launches.",
       );
       form.reset();
       setIsVerified(false);
-      setStatusMessage("Please verify again to submit.");
+      setStatusMessage("");
     } catch (error) {
       const message =
         error instanceof Error

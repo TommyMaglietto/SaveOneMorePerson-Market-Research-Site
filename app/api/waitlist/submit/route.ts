@@ -92,6 +92,23 @@ export async function POST(request: Request) {
   }
 
   const supabase = getSupabaseAdmin();
+  const { data: existing, error: lookupError } = await supabase
+    .from("Emails")
+    .select("email")
+    .eq("email", email)
+    .limit(1);
+  if (lookupError) {
+    console.error("[waitlist-submit] Supabase lookup failed", lookupError);
+    return NextResponse.json(
+      { error: "Unable to save right now. Please try again." },
+      { status: 500 },
+    );
+  }
+
+  if (existing && existing.length > 0) {
+    return NextResponse.json({ ok: true, alreadySubscribed: true }, { status: 200 });
+  }
+
   const { error } = await supabase.from("Emails").insert({ email });
   if (error) {
     console.error("[waitlist-submit] Supabase insert failed", error);
